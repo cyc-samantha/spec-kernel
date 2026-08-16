@@ -29,7 +29,7 @@ or explicitly deferred, and no `proposed` provenance left in it. See
 
 | File | For |
 |---|---|
-| `docs/BUILD-PLAN.md` | the decision ledger and the remaining slices — read this before changing anything |
+| `docs/BUILD-PLAN.md` | the decision ledger and completed slice history — read this before changing anything |
 | `README.md` | someone adopting the kernel |
 | `CLAUDE.md` | an agent working on **this** repo |
 
