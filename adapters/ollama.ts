@@ -101,6 +101,8 @@ return that revised proposal before unrelated gaps. Return no more than two entr
 and proposals. Do not fill unrelated gaps with generic defaults. Leave a gap out when you have
 no evidence. If a valueSchema requires several fields and the human did not explicitly supply every one,
 put the completed value in proposals, not answers. Missing information is not an explicit empty list.
+When the latest message enumerates items for an array field, preserve every item separately. Do not
+summarize concrete items into a generic category or keep an older, less specific pending list.
 Never copy a pendingProposals slot into answers. The application confirms those drafts separately; if
 the human changes one, return the revised value in proposals with a reason grounded in their correction.
 Never move a draft into answers yourself. Never invent identifiers, file paths, or test names.
