@@ -14,7 +14,7 @@ export type ConversationMessage = z.infer<typeof conversationMessageSchema>;
 export interface ModelRequest {
   messages: readonly ConversationMessage[];
   draft: unknown;
-  missing: MissingItem;
+  missing: readonly MissingItem[];
 }
 
 /**
@@ -22,18 +22,21 @@ export interface ModelRequest {
  * The application boundary applies and checks it; the model never returns a
  * seal verdict.
  */
-export const modelProposalSchema = z.discriminatedUnion('answered', [
-  z.object({
-    answered: z.literal(true),
-    assistantMessage: nonBlank,
-    value: z.unknown().refine((value) => value !== undefined, 'an answered proposal needs a value'),
-  }).strict(),
-  z.object({
-    answered: z.literal(false),
-    assistantMessage: nonBlank,
-    value: z.never().optional(),
-  }).strict(),
-]);
+const proposedAnswerSchema = z.object({
+  ruleId: nonBlank,
+  slot: nonBlank,
+  value: z.unknown().refine((value) => value !== undefined, 'a proposed answer needs a value'),
+}).strict();
+
+export const modelProposalSchema = z.object({
+  assistantMessage: nonBlank,
+  answers: z.array(proposedAnswerSchema).max(64),
+}).strict().superRefine((proposal, context) => {
+  const keys = proposal.answers.map((answer) => `${answer.ruleId}\u0000${answer.slot}`);
+  if (new Set(keys).size !== keys.length) {
+    context.addIssue({ code: 'custom', path: ['answers'], message: 'proposed answers must be unique' });
+  }
+});
 
 export type ModelProposal = z.infer<typeof modelProposalSchema>;
 

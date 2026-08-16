@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ModelPort } from '../ports/model.ts';
 import { loadProjectDeclaration, type ProjectDeclaration } from '../ports/project.ts';
@@ -37,13 +37,41 @@ describe('conversational specification intake', () => {
       project(),
       'local-user',
       'There are no blocking decisions.',
-      responses({ answered: true, assistantMessage: 'No blocking decisions recorded.', value: [] }),
+      responses({
+        assistantMessage: 'No blocking decisions recorded.',
+        answers: [{ ruleId: 'blocking-decisions-declared', slot: 'blockingDecisions', value: [] }],
+      }),
     );
 
     expect(result).toEqual(expect.objectContaining({ status: 'sealed' }));
     expect(result.state.answers).toEqual([
       expect.objectContaining({ slot: 'blockingDecisions', answeredBy: 'local-user' }),
     ]);
+  });
+
+  it('extracts several currently offered gaps with one model inference', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete (draft['scope'] as Record<string, unknown>)['exclude'];
+    delete draft['constraints'];
+    const complete = vi.fn().mockResolvedValue({
+      assistantMessage: 'I recorded the boundary and open-decision state.',
+      answers: [
+        { ruleId: 'required-slots', slot: 'scope.exclude', value: ['generated/**'] },
+        { ruleId: 'required-slots', slot: 'constraints', value: ['keep the wire format stable'] },
+      ],
+    });
+
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'Do not touch generated files, and keep the wire format stable.',
+      { complete },
+    );
+
+    expect(result.status).toBe('sealed');
+    expect(result.state.answers).toHaveLength(2);
+    expect(complete).toHaveBeenCalledOnce();
   });
 
   it('allows the same entitled user to complete a technical gap without changing the rule', async () => {
@@ -55,9 +83,12 @@ describe('conversational specification intake', () => {
       'local-user',
       'The test is in tests/export.test.ts and is named rejects unsupported fields.',
       responses({
-        answered: true,
         assistantMessage: 'I recorded the named test.',
-        value: { file: 'tests/export.test.ts', name: 'rejects unsupported fields' },
+        answers: [{
+          ruleId: 'executable-test-target',
+          slot: 'acceptance.AC-02.targetTest',
+          value: { file: 'tests/export.test.ts', name: 'rejects unsupported fields' },
+        }],
       }),
     );
 
@@ -102,7 +133,7 @@ describe('conversational specification intake', () => {
       project(),
       'local-user',
       'I am not sure.',
-      responses({ answered: false, assistantMessage: 'I could not find that decision in your answer.' }),
+      responses({ assistantMessage: 'I could not find that decision in your answer.', answers: [] }),
     );
 
     expect(result).toEqual(expect.objectContaining({

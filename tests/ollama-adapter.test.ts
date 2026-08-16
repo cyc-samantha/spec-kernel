@@ -7,13 +7,13 @@ function request(): ModelRequest {
   return {
     messages: [{ role: 'user', content: 'There are no blocking decisions.' }],
     draft: { title: 'Example' },
-    missing: {
+    missing: [{
       ruleId: 'blocking-decisions-declared',
       slot: 'blockingDecisions',
       question: 'Were blocking decisions considered, and which decisions remain?',
       entitlement: 'requester',
       message: 'blockingDecisions must be explicitly declared',
-    },
+    }],
   };
 }
 
@@ -22,18 +22,24 @@ describe('Ollama model adapter', () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
       message: {
         content: JSON.stringify({
-          answered: true,
           assistantMessage: 'No blocking decisions recorded.',
-          value: [],
+          answers: [{
+            ruleId: 'blocking-decisions-declared',
+            slot: 'blockingDecisions',
+            value: [],
+          }],
         }),
       },
     }), { status: 200, headers: { 'content-type': 'application/json' } }));
     const adapter = new OllamaAdapter({ model: 'local-model', fetch: fetchMock });
 
     await expect(adapter.complete(request())).resolves.toEqual({
-      answered: true,
       assistantMessage: 'No blocking decisions recorded.',
-      value: [],
+      answers: [{
+        ruleId: 'blocking-decisions-declared',
+        slot: 'blockingDecisions',
+        value: [],
+      }],
     });
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0]!;

@@ -5,23 +5,24 @@ import { loadModelProposal } from '../ports/model.ts';
 describe('model port response boundary', () => {
   it('admits a structured answer without attaching a provider format', () => {
     expect(loadModelProposal({
-      answered: true,
       assistantMessage: 'I understood the excluded scope.',
-      value: ['generated/**'],
+      answers: [{ ruleId: 'required-slots', slot: 'scope.exclude', value: ['generated/**'] }],
     })).toEqual({
       ok: true,
       proposal: {
-        answered: true,
         assistantMessage: 'I understood the excluded scope.',
-        value: ['generated/**'],
+        answers: [{ ruleId: 'required-slots', slot: 'scope.exclude', value: ['generated/**'] }],
       },
     });
   });
 
-  it('refuses an answer that omits the proposed value', () => {
+  it('refuses duplicate answers for the same Rule-owned slot', () => {
     expect(loadModelProposal({
-      answered: true,
       assistantMessage: 'I understood the answer.',
+      answers: [
+        { ruleId: 'required-slots', slot: 'scope.exclude', value: [] },
+        { ruleId: 'required-slots', slot: 'scope.exclude', value: ['generated/**'] },
+      ],
     })).toEqual({
       ok: false,
       reason: 'the model response did not match the proposal schema',

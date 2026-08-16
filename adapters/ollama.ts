@@ -7,19 +7,31 @@ const MAX_RESPONSE_BYTES = 1024 * 1024;
 const proposalFormat = {
   type: 'object',
   properties: {
-    answered: { type: 'boolean' },
     assistantMessage: { type: 'string', minLength: 1 },
-    value: {},
+    answers: {
+      type: 'array',
+      maxItems: 64,
+      items: {
+        type: 'object',
+        properties: {
+          ruleId: { type: 'string', minLength: 1 },
+          slot: { type: 'string', minLength: 1 },
+          value: {},
+        },
+        required: ['ruleId', 'slot', 'value'],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ['answered', 'assistantMessage'],
+  required: ['assistantMessage', 'answers'],
   additionalProperties: false,
 } as const;
 
 const systemPrompt = `You translate human answers into one structured specification value.
 Use only facts stated by the human in the conversation. Never invent an answer.
-The supplied gap and question originate in a deterministic Rule. Answer that gap only.
-If the human did not answer it, return answered=false and omit value.
-If answered, return answered=true and put the exact JSON value for the supplied slot in value.
+The supplied gaps and questions originate in deterministic Rules.
+Return an answers entry only for a gap the human actually answered. Copy its ruleId and slot exactly.
+Put the exact JSON value for that supplied slot in value. Omit unanswered gaps from answers.
 assistantMessage briefly explains what was or was not understood; do not ask another question.
 Never claim that a specification is complete or sealed.`;
 
@@ -92,7 +104,7 @@ export class OllamaAdapter implements ModelPort {
               role: 'system',
               content: JSON.stringify({
                 currentDraft: request.draft,
-                gap: request.missing,
+                gaps: request.missing,
               }),
             },
           ],
