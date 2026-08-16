@@ -453,6 +453,14 @@ export async function converse(
   if (spoken.kind === 'needs_naming') {
     return askResult(current, initialStep, authorityNaming(spoken.slots));
   }
+  /*
+   * Agreement with nothing standing carries no information either way. Sending
+   * it to the translator spends an inference to learn that, and records a
+   * stalled attempt on a question the requester never actually declined.
+   */
+  if (spoken.kind === 'nothing_pending') {
+    return askResult(current, initialStep, 'Nothing is waiting for your agreement right now.');
+  }
 
   const offered = new Map(eligibleMissing(current.draft, project, identity).map((item) => [gapKey(item), item]));
   const beforeAnswerCount = current.answers.length;
