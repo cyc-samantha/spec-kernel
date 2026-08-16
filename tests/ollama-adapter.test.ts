@@ -153,6 +153,44 @@ describe('Ollama model adapter', () => {
     } satisfies Partial<ModelPortError>);
   });
 
+  it('asks for a split verdict under the same window and refusal rules', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(reply({
+      message: { content: JSON.stringify({ verdict: 'keep', because: 'the criteria depend on each other' }) },
+    }));
+    const adapter = new OllamaAdapter({ model: 'local-model', fetch: fetchMock });
+
+    await expect(adapter.splitIntent({
+      intent: {
+        id: 'INT-01',
+        title: 'Bounded intent',
+        authored_by: 'sam',
+        criteria: [{ id: 'AC-01', text: 'A user can export invoices.', target: 'example/repository' }],
+      },
+    })).resolves.toEqual({ verdict: 'keep', because: 'the criteria depend on each other' });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)) as Record<string, unknown>;
+    expect(JSON.stringify(body)).toContain('AC-01');
+    expect(JSON.stringify(body)).toContain('dependence, not count');
+    expect(body['options']).toEqual(expect.objectContaining({ num_ctx: expect.any(Number) }));
+  });
+
+  it('refuses a split verdict the runtime generated past its window', async () => {
+    const adapter = new OllamaAdapter({
+      model: 'local-model',
+      contextTokens: 4096,
+      maxOutputTokens: 4000,
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(reply({ prompt_eval_count: 200 })),
+    });
+    await expect(adapter.splitIntent({
+      intent: {
+        id: 'INT-01',
+        title: 'Bounded intent',
+        authored_by: 'sam',
+        criteria: [{ id: 'AC-01', text: 'A user can export invoices.', target: 'example/repository' }],
+      },
+    })).rejects.toMatchObject({ failure: 'context_exceeded' } satisfies Partial<ModelPortError>);
+  });
+
   it('refuses an unevaluable model envelope', async () => {
     const adapter = new OllamaAdapter({
       model: 'local-model',
