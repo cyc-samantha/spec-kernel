@@ -145,7 +145,7 @@ survives only if breaking it fails the build` — a day later is already too lat
 
 ---
 
-### S1 · Slot model and seal-check (**deterministic, no model**)
+### S1 · Slot model and seal-check (**deterministic, no model**) — **DONE**
 
 `branch: s1-seal-check`
 
