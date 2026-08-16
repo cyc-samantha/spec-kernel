@@ -298,16 +298,42 @@ function promptFor(
 function askResult(
   state: ConversationState,
   step: Extract<ReturnType<typeof advanceInterview>, { status: 'ask' }>,
-  assistantMessage: string,
+  progressMessage: string,
 ): ConversationResult {
   const prompt = promptFor(state, step);
   return {
     status: 'ask',
-    state: withAssistant(state, [assistantMessage, prompt].filter(Boolean).join('\n\n')),
+    state: withAssistant(state, [progressMessage, prompt].filter(Boolean).join('\n\n')),
     missing: step.missing,
     prompt,
     proposals: state.proposals,
   };
+}
+
+function sameProposal(left: SlotProposal | undefined, right: SlotProposal): boolean {
+  return left !== undefined
+    && left.reason === right.reason
+    && JSON.stringify(left.value) === JSON.stringify(right.value);
+}
+
+/** The ledger narrates progress; model prose cannot claim writes that did not happen. */
+function progressMessage(
+  beforeAnswerCount: number,
+  beforeProposals: readonly SlotProposal[],
+  state: ConversationState,
+): string {
+  const recorded = state.answers.slice(beforeAnswerCount);
+  const human = recorded.filter((answer) => answer.source === 'human').map((answer) => answer.slot);
+  const derived = recorded.filter((answer) => answer.source === 'derived').map((answer) => answer.slot);
+  const prior = new Map(beforeProposals.map((proposal) => [gapKey(proposal), proposal]));
+  const drafted = state.proposals
+    .filter((proposal) => !sameProposal(prior.get(gapKey(proposal)), proposal))
+    .map((proposal) => proposal.slot);
+  return [
+    human.length > 0 ? `I recorded ${human.join(', ')}.` : '',
+    derived.length > 0 ? `I derived ${derived.join(', ')}.` : '',
+    drafted.length > 0 ? `Drafts awaiting your confirmation: ${drafted.join(', ')}.` : '',
+  ].filter(Boolean).join(' ');
 }
 
 /**
@@ -334,6 +360,7 @@ export async function converse(
     return { status: 'refused', state: current, reason: 'the current Rule question could not be selected' };
   }
   const offered = new Map(eligibleMissing(current.draft, project, identity).map((item) => [gapKey(item), item]));
+  const beforeAnswerCount = current.answers.length;
 
   let raw: unknown;
   try {
@@ -353,16 +380,13 @@ export async function converse(
   }
 
   const applied = applyModelAnswers(current, offered, loaded.proposal.answers, identity, project);
-  const answered = applied.answers.length > current.answers.length;
   current = withDerivations(applied, project);
   current = {
     ...current,
     proposals: mergeUsableProposals(current, state.proposals, loaded.proposal.proposals),
   };
   current = withAttempt(current, initialStep.missing, initialStep.prompt, draftedBefore);
-  // WHY: prose claiming a turn understood and drafted, over a ledger that
-  // recorded neither, is indistinguishable to the requester from progress.
-  const narration = answered || current.proposals.length > 0 ? loaded.proposal.assistantMessage : '';
+  const narration = progressMessage(beforeAnswerCount, state.proposals, current);
 
   const step = nextStep(current, project, identity);
   const terminal = terminalResult(step, current, narration);

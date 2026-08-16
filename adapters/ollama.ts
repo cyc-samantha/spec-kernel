@@ -32,7 +32,6 @@ const valueEntry = {
 const proposalFormat = {
   type: 'object',
   properties: {
-    assistantMessage: { type: 'string', minLength: 1 },
     answers: { type: 'array', maxItems: 64, items: valueEntry },
     proposals: {
       type: 'array',
@@ -44,7 +43,7 @@ const proposalFormat = {
       },
     },
   },
-  required: ['assistantMessage', 'answers', 'proposals'],
+  required: ['answers', 'proposals'],
   additionalProperties: false,
 } as const;
 
@@ -97,7 +96,7 @@ conversation it rests on. A draft is a suggestion for a person to accept or corr
 Draft every gap you can reasonably infer; leave a gap out of both lists when you have nothing to go on.
 Never move a draft into answers yourself. Never invent identifiers, file paths, or test names.
 
-assistantMessage briefly says what you understood and what you drafted; do not ask another question.
+Return only answers and proposals. The application reports progress and asks the next question.
 Never claim that a specification is complete or sealed.`;
 
 export interface OllamaAdapterOptions {

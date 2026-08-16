@@ -78,6 +78,7 @@ describe('Ollama model adapter', () => {
     expect(JSON.stringify(body)).toContain('the requester named no constraints');
     expect(JSON.stringify(body)).toContain('Never move a draft into answers yourself');
     expect(JSON.stringify(body)).toContain('Never claim that a specification is complete or sealed');
+    expect(JSON.stringify(body['format'])).not.toContain('assistantMessage');
   });
 
   it('refuses an unavailable runtime', async () => {

@@ -313,6 +313,30 @@ describe('conversational specification intake', () => {
     );
   });
 
+  it('describes progress from recorded slots instead of model narration', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'There are no blocking decisions.',
+      responses({
+        assistantMessage: 'I repeated an old summary about a different scope.',
+        answers: [{
+          ruleId: 'blocking-decisions-declared',
+          slot: 'blockingDecisions',
+          value: [],
+        }],
+        proposals: [],
+      }),
+    );
+
+    expect(result.state.messages.at(-1)?.content).toBe(
+      'I recorded blockingDecisions.\n\nThe deterministic seal-check now has zero gaps.',
+    );
+  });
+
   it('names the slots a confirmation recorded rather than repeating one line', () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['blockingDecisions'];

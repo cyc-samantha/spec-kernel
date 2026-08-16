@@ -55,7 +55,9 @@ function duplicated(entries: readonly { ruleId: string; slot: string }[]): boole
 }
 
 export const modelProposalSchema = z.object({
-  assistantMessage: nonBlank,
+  // Accepted during migration from the original narrator-shaped port. The
+  // application deliberately ignores it; progress comes from its ledger.
+  assistantMessage: nonBlank.optional(),
   answers: z.array(answerSchema).max(64),
   proposals: z.array(draftedValueSchema).max(64).default([]),
 }).strict().superRefine((proposal, context) => {
