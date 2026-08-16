@@ -100,6 +100,24 @@ function gapKey(gap: { ruleId: string; slot: string }): string {
   return `${gap.ruleId}\u0000${gap.slot}`;
 }
 
+function namesSlot(message: string, slot: string): boolean {
+  const topLevel = slot.split('.')[0]!;
+  const words = topLevel.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+  const normalized = message.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+  return ` ${normalized.trim()} `.includes(` ${words} `);
+}
+
+/** An explicit correction to a standing draft outranks the otherwise next Rule. */
+function modelFocus(
+  message: string,
+  proposals: readonly SlotProposal[],
+  offered: ReadonlyMap<string, MissingItem>,
+  fallback: MissingItem,
+): MissingItem {
+  const named = proposals.find((proposal) => namesSlot(message, proposal.slot));
+  return named ? offered.get(gapKey(named)) ?? fallback : fallback;
+}
+
 /** A candidate only counts when the rule that reported the gap now admits it. */
 function resolves(draft: unknown, missing: MissingItem, value: unknown): unknown | undefined {
   const candidate = applyAnswer(draft, missing, value);
@@ -372,13 +390,14 @@ export async function converse(
   }
   const offered = new Map(eligibleMissing(current.draft, project, identity).map((item) => [gapKey(item), item]));
   const beforeAnswerCount = current.answers.length;
+  const focus = modelFocus(userMessage, current.proposals, offered, initialStep.missing);
 
   let raw: unknown;
   try {
     raw = await model.complete({
       messages: current.messages,
       draft: current.draft,
-      focus: initialStep.missing,
+      focus,
       missing: [...offered.values()],
       proposals: current.proposals,
     });

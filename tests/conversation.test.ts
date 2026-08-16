@@ -258,7 +258,7 @@ describe('conversational specification intake', () => {
   });
 
   it('keeps data-mapping scope supplied out of order without stalling on intent', async () => {
-    const model = responses(
+    const outputs = [
       {
         answers: [],
         proposals: [
@@ -269,10 +269,10 @@ describe('conversational specification intake', () => {
             reason: 'the requester said they want to build a tool',
           },
           {
-            ruleId: 'title-stated',
-            slot: 'title',
-            value: 'Data mapping tool',
-            reason: 'the requester named the tool they want to build',
+            ruleId: 'scope-bounded',
+            slot: 'scope',
+            value: { include: ['column mapping logic'], exclude: ['database schema changes'] },
+            reason: 'the requester described mapping logic but did not explicitly name exclusions',
           },
         ],
       },
@@ -293,7 +293,14 @@ describe('conversational specification intake', () => {
           reason: 'the requester supplied four literal column mappings but named no exclusions',
         }],
       },
-    );
+    ];
+    const focuses: string[] = [];
+    const model: ModelPort = {
+      complete: async (request) => {
+        focuses.push(request.focus.slot);
+        return outputs.shift();
+      },
+    };
 
     const first = await converse(
       state({}),
@@ -312,7 +319,8 @@ describe('conversational specification intake', () => {
 
     expect(second.status).toBe('ask');
     expect(second.state.attempts.map((attempt) => attempt.yieldedNewInformation)).toEqual([true, true]);
-    expect(second.state.proposals.map((proposal) => proposal.slot)).toEqual(['intent', 'title', 'scope']);
+    expect(focuses).toEqual(['intent', 'scope']);
+    expect(second.state.proposals.map((proposal) => proposal.slot)).toEqual(['intent', 'scope']);
     expect(second.state.messages.at(-1)?.content).toContain('Drafts awaiting your confirmation: scope.');
     expect(second.state.messages.at(-1)?.content).not.toContain('That did not answer');
   });
