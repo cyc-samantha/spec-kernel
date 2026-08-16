@@ -68,7 +68,7 @@ export interface ModelPort {
   complete(request: ModelRequest): Promise<unknown>;
 }
 
-export type ModelPortFailure = 'unavailable' | 'invalid_response' | 'timed_out';
+export type ModelPortFailure = 'unavailable' | 'invalid_response' | 'timed_out' | 'context_exceeded';
 
 export class ModelPortError extends Error {
   readonly failure: ModelPortFailure;
