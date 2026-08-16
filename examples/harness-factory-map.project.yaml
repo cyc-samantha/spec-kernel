@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "target_repository": "cyc-samantha/harness-factory-map",
+  "boundary_source": ".harness/project.yaml",
+  "slot_entitlements": {
+    "requester": ["map-owner"],
+    "technical_author": ["map-maintainer"]
+  },
+  "signing_identity": "map-maintainer"
+}
