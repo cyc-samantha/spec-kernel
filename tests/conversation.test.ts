@@ -490,6 +490,59 @@ describe('conversational specification intake', () => {
     expect(result.state.answers).toEqual([]);
   });
 
+  it('records a draft the requester accepted in the chat, without asking the model', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const carried: ConversationState = {
+      ...state(draft),
+      proposals: [{
+        ruleId: 'blocking-decisions-declared',
+        slot: 'blockingDecisions',
+        question: 'Which decisions are still open and block this work? An empty list is an answer.',
+        value: [],
+        reason: 'you said nothing else is blocked',
+        consequence: 'routine',
+        entitlement: 'requester',
+      }],
+    };
+    const complete = vi.fn();
+
+    const result = await converse(carried, project(), 'local-user', 'yes', { complete });
+
+    expect(complete).not.toHaveBeenCalled();
+    expect(result.status).toBe('sealed');
+    expect(result.state.answers).toEqual([
+      expect.objectContaining({ slot: 'blockingDecisions', source: 'human', answeredBy: 'local-user' }),
+    ]);
+    expect(result.state.proposals).toEqual([]);
+  });
+
+  /* D14: losing the tick box must not lose the reading that preceded it. */
+  it('asks for an authority draft by name rather than taking agreement for a grant', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['authority'];
+    const carried: ConversationState = {
+      ...state(draft),
+      proposals: [{
+        ruleId: 'authority-granted',
+        slot: 'authority',
+        question: 'What may an Agent do without asking, and what must it bring back to a human?',
+        value: { allowed: ['edit implementation'], requiresHuman: [], automationLevel: 'agent-with-review' },
+        reason: 'drafted from the described change',
+        consequence: 'authority',
+        entitlement: 'requester',
+      }],
+    };
+    const complete = vi.fn();
+
+    const result = await converse(carried, project(), 'local-user', 'yes', { complete });
+
+    expect(complete).not.toHaveBeenCalled();
+    expect(result.state.draft).not.toEqual(expect.objectContaining({ authority: expect.anything() }));
+    expect(result.state.messages.at(-1)?.content).toContain('what an Agent may do unsupervised');
+    expect(result.state.messages.at(-1)?.content).toContain('confirm authority');
+  });
+
   it('records a confirmed draft as the confirming person answer', async () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['blockingDecisions'];

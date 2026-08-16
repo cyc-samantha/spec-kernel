@@ -4,6 +4,7 @@ import { advanceInterview, type InterviewAttempt } from '../kernel/interview.ts'
 import { sealCheck, type MissingItem } from '../kernel/seal-check.ts';
 import type { Consequence, Entitlement, RuleId } from '../kernel/rules.ts';
 import type { ProjectDeclaration } from '../ports/project.ts';
+import { readConfirmation } from './confirmation.ts';
 import { modelRefusalReason } from './model-refusal.ts';
 import {
   conversationMessageSchema,
@@ -332,6 +333,14 @@ function promptFor(
   return `I drafted an answer for this. Confirm it above, or correct me here. ${step.missing.question}`;
 }
 
+/*
+ * A grant of authority nobody read is a grant the machine made itself (D14).
+ * Agreement is enough for a routine draft; this one has to be said by name.
+ */
+function authorityNaming(slots: readonly string[]): string {
+  return `${slots.join(', ')} decides what an Agent may do unsupervised, so I cannot take a general yes for it. Say "confirm ${slots[0]}" to grant it, or tell me what it should say instead.`;
+}
+
 function askResult(
   state: ConversationState,
   step: Extract<ReturnType<typeof advanceInterview>, { status: 'ask' }>,
@@ -412,6 +421,12 @@ export async function converse(
   if (initialStep.status !== 'ask') {
     return { status: 'refused', state: current, reason: 'the current Rule question could not be selected' };
   }
+  const spoken = readConfirmation(userMessage, current.proposals);
+  if (spoken.kind === 'confirms') return confirmProposals(current, project, identity, spoken.slots);
+  if (spoken.kind === 'needs_naming') {
+    return askResult(current, initialStep, authorityNaming(spoken.slots));
+  }
+
   const offered = new Map(eligibleMissing(current.draft, project, identity).map((item) => [gapKey(item), item]));
   const beforeAnswerCount = current.answers.length;
   const focus = modelFocus(userMessage, current.proposals, offered, initialStep.missing);
