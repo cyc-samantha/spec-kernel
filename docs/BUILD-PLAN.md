@@ -85,6 +85,7 @@ L2 and L3 exist and work. This repository is the missing front half.
 | **D27** | **`risk`, `irreversibility`, and `authority` are marked `consequence: authority` and can never be `machine_derives`.** They decide how much damage an agent may do unsupervised. A machine that fills them silently has granted itself the permission, and seal-check passes it because the field has a value (D14). The UI renders them apart and unticked; the kernel refuses a blanket confirmation. |
 | **D28** | **A gap with a draft on offer is asked as a confirmation, and a draft the requester has not seen counts as progress under D10.** Otherwise the interview argues with its own suggestion: it shows a drafted value and in the same breath complains the question went unanswered, then declares a blocking decision over a slot it has already filled. The same draft a second time is *not* progress — an ignored suggestion must not keep an interview alive forever. |
 | **D29** | **The interviewer's prose is carried only when the ledger backs it.** A model summary is dropped unless the turn recorded an answer or kept a draft, and a confirmation names the slots it wrote. A requester cannot distinguish a fluent summary from a result, so an unbacked summary is a claim of progress the document does not support (D22). |
+| **D30** | **A model adapter declares its context window and refuses a reply that overran it.** A local runtime whose window cannot hold the prompt does not fail — it discards the oldest tokens, which are the instructions, and answers HTTP 200 anyway. The reply is fluent and grounded in nothing. Inheriting the runtime's default window is therefore a fail-open on the one input the kernel cannot re-derive: what the requester actually said. |
 
 ## Known gaps, and what happens to each
 
@@ -411,6 +412,33 @@ answer.
 **Done when**: a requester who describes work in prose is shown what the machine
 drafted and asked to confirm it, and no slot the machine has drafted is ever
 escalated to a blocking decision on the turn it was drafted.
+
+---
+
+### S13 · The context window is declared, not inherited — **DONE**
+
+`branch: s13-context-truncation-guard`
+
+The interview reached `the configured model returned an invalid response` and
+the runtime looked healthy, because it was. Ollama inherits a 4096-token window
+and silently drops whatever does not fit. Measured against qwen3.5:2b: a 33 KB
+conversation came back as `prompt_eval_count=25`, HTTP 200, with a confident
+answer to a conversation it had already discarded. What gets dropped first is
+the system prompt — so the reply is fluent, unformatted, and grounded in
+nothing.
+
+- `OllamaAdapter` declares `num_ctx` and refuses a window that does not exceed
+  its own output budget. Asking for 4096 output tokens inside a 4096-token
+  window guarantees the overrun.
+- A reply is refused when `prompt_eval_count + maxOutputTokens > num_ctx`, and
+  when the runtime will not report how much it read (D30).
+- `context_exceeded` is its own failure: "unavailable" sends the requester to
+  check a runtime that is running fine.
+- `SPEC_MODEL_CONTEXT_TOKENS` sizes the window per deployment.
+
+**Done when**: a conversation that outgrows the window stops the interview with
+a message naming the window, and never with a translation of a prompt the
+runtime discarded.
 
 ---
 

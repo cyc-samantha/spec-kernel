@@ -130,12 +130,14 @@ function configuredModel(): { model: ModelPort; label: string } {
   const baseUrl = process.env['SPEC_MODEL_URL']?.trim();
   const timeoutMs = positiveIntegerSetting('SPEC_MODEL_TIMEOUT_MS');
   const maxOutputTokens = positiveIntegerSetting('SPEC_MODEL_MAX_OUTPUT_TOKENS');
+  const contextTokens = positiveIntegerSetting('SPEC_MODEL_CONTEXT_TOKENS');
   return {
     model: new OllamaAdapter({
       model: name,
       ...(baseUrl ? { baseUrl } : {}),
       ...(timeoutMs ? { timeoutMs } : {}),
       ...(maxOutputTokens ? { maxOutputTokens } : {}),
+      ...(contextTokens ? { contextTokens } : {}),
     }),
     label: `Ollama · ${name}`,
   };

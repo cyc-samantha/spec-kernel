@@ -3,6 +3,12 @@ import { ModelPortError, type ModelPort, type ModelRequest } from '../ports/mode
 const DEFAULT_BASE_URL = 'http://127.0.0.1:11434';
 const DEFAULT_TIMEOUT_MS = 300_000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+/*
+ * Ollama defaults this to 4096 and silently drops whatever does not fit — a
+ * 33 KB conversation came back as prompt_eval_count=25 with a confident wrong
+ * answer. The window is declared here so the gate below has a number to check.
+ */
+const DEFAULT_CONTEXT_TOKENS = 16_384;
 const DEFAULT_KEEP_ALIVE = '10m';
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 
@@ -54,7 +60,31 @@ export interface OllamaAdapterOptions {
   baseUrl?: string;
   timeoutMs?: number;
   maxOutputTokens?: number;
+  contextTokens?: number;
   fetch?: typeof fetch;
+}
+
+function positiveInteger(value: number | undefined, fallback: number, name: string): number {
+  if (value === undefined) return fallback;
+  if (!Number.isInteger(value) || value < 1) {
+    throw new ModelPortError('unavailable', `the model ${name} must be a positive integer`);
+  }
+  return value;
+}
+
+/**
+ * Refuses a reply the runtime could not have produced with the whole prompt in
+ * view. Ollama reports how much it read; a generation that would not fit beside
+ * that reading overran the window, and what overran it was the instructions.
+ */
+function assertReplyFitsWindow(envelope: Record<string, unknown>, contextTokens: number, outputTokens: number): void {
+  const read = envelope['prompt_eval_count'];
+  if (typeof read !== 'number' || !Number.isInteger(read) || read < 0) {
+    throw new ModelPortError('context_exceeded', 'the model runtime did not report how much of the prompt it read');
+  }
+  if (read + outputTokens > contextTokens) {
+    throw new ModelPortError('context_exceeded', 'the conversation no longer fits the model context window');
+  }
 }
 
 function chatEndpoint(baseUrl: string): URL {
@@ -91,23 +121,19 @@ export class OllamaAdapter implements ModelPort {
   readonly #model: string;
   readonly #timeoutMs: number;
   readonly #maxOutputTokens: number;
+  readonly #contextTokens: number;
   readonly #fetch: typeof fetch;
 
   constructor(options: OllamaAdapterOptions) {
     if (!options.model.trim()) throw new ModelPortError('unavailable', 'a model name is required');
-    if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1)) {
-      throw new ModelPortError('unavailable', 'the model timeout must be a positive integer');
-    }
-    if (
-      options.maxOutputTokens !== undefined
-      && (!Number.isInteger(options.maxOutputTokens) || options.maxOutputTokens < 1)
-    ) {
-      throw new ModelPortError('unavailable', 'the model output budget must be a positive integer');
+    this.#timeoutMs = positiveInteger(options.timeoutMs, DEFAULT_TIMEOUT_MS, 'timeout');
+    this.#maxOutputTokens = positiveInteger(options.maxOutputTokens, DEFAULT_MAX_OUTPUT_TOKENS, 'output budget');
+    this.#contextTokens = positiveInteger(options.contextTokens, DEFAULT_CONTEXT_TOKENS, 'context window');
+    if (this.#contextTokens <= this.#maxOutputTokens) {
+      throw new ModelPortError('unavailable', 'the model context window must exceed its output budget');
     }
     this.#endpoint = chatEndpoint(options.baseUrl ?? DEFAULT_BASE_URL);
     this.#model = options.model;
-    this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    this.#maxOutputTokens = options.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     this.#fetch = options.fetch ?? fetch;
   }
 
@@ -124,7 +150,7 @@ export class OllamaAdapter implements ModelPort {
           think: false,
           keep_alive: DEFAULT_KEEP_ALIVE,
           format: proposalFormat,
-          options: { temperature: 0, num_predict: this.#maxOutputTokens },
+          options: { temperature: 0, num_predict: this.#maxOutputTokens, num_ctx: this.#contextTokens },
           messages: [
             { role: 'system', content: systemPrompt },
             ...request.messages,
@@ -157,6 +183,7 @@ export class OllamaAdapter implements ModelPort {
     if (typeof envelope !== 'object' || envelope === null) {
       throw new ModelPortError('invalid_response', 'the model runtime returned an invalid envelope');
     }
+    assertReplyFitsWindow(envelope as Record<string, unknown>, this.#contextTokens, this.#maxOutputTokens);
     const message = (envelope as Record<string, unknown>)['message'];
     const content = typeof message === 'object' && message !== null
       ? (message as Record<string, unknown>)['content']
