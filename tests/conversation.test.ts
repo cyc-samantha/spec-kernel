@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ModelPortError, type ModelPort } from '../ports/model.ts';
 import { loadProjectDeclaration, type ProjectDeclaration } from '../ports/project.ts';
 import { sealCheck } from '../kernel/seal-check.ts';
-import { confirmProposals, converse, type ConversationState } from '../ui/conversation.ts';
+import { confirmProposalValues, confirmProposals, converse, type ConversationState } from '../ui/conversation.ts';
 import { validSpecification } from './fixtures/valid-specification.ts';
 
 function project(): ProjectDeclaration {
@@ -516,6 +516,33 @@ describe('conversational specification intake', () => {
       expect.objectContaining({ slot: 'blockingDecisions', answeredBy: 'local-user', source: 'human' }),
     ]);
     expect(confirmed.state.proposals).toEqual([]);
+  });
+
+  it('validates and records a human-edited proposal value', () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['scope'];
+    const carried: ConversationState = {
+      ...state(draft),
+      proposals: [{
+        ruleId: 'scope-bounded',
+        slot: 'scope',
+        question: 'What is inside this change, and what is explicitly outside it?',
+        value: { include: ['column mapping logic'], exclude: [] },
+        reason: 'drafted from the initial description',
+        consequence: 'routine',
+        entitlement: 'requester',
+      }],
+    };
+    const mappings = {
+      include: ['first name -> surname', 'last name -> forename', 'full name -> Name', 'date of birth -> DOB'],
+      exclude: [],
+    };
+
+    const result = confirmProposalValues(carried, project(), 'local-user', [{ slot: 'scope', value: mappings }]);
+
+    expect(result.status).toBe('sealed');
+    expect(result.state.draft).toEqual(expect.objectContaining({ scope: mappings }));
+    expect(result.state.answers.at(-1)).toEqual(expect.objectContaining({ slot: 'scope', value: mappings }));
   });
 
   it('does not let the model confirm its own pending proposal', async () => {

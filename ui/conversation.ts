@@ -486,15 +486,35 @@ export function confirmProposals(
   slots: readonly string[],
 ): ConversationResult {
   const named = new Set(slots);
-  const accepted = state.proposals.filter((proposal) => named.has(proposal.slot));
-  if (accepted.length === 0) {
+  const selected = state.proposals
+    .filter((proposal) => named.has(proposal.slot))
+    .map((proposal) => ({ slot: proposal.slot, value: proposal.value }));
+  return confirmProposalValues(state, project, identity, selected);
+}
+
+/** Validates human-edited drafts through the same Rule before recording them. */
+export function confirmProposalValues(
+  state: ConversationState,
+  project: ProjectDeclaration,
+  identity: string,
+  selections: readonly { slot: string; value: unknown }[],
+): ConversationResult {
+  const selected = selections.flatMap((selection) => {
+    const proposal = state.proposals.find((candidate) => candidate.slot === selection.slot);
+    return proposal ? [{ ...proposal, value: selection.value }] : [];
+  });
+  if (selected.length === 0) {
     return { status: 'refused', state, reason: 'a confirmation must name at least one drafted slot' };
   }
-  let current = accepted.reduce((carried, proposal) => confirmOne(carried, proposal, identity, project), state);
-  const recorded = accepted
+  let current = selected.reduce((carried, proposal) => confirmOne(carried, proposal, identity, project), state);
+  const recorded = selected
     .filter((proposal) => !sealCheck(current.draft).some((item) => gapKey(item) === gapKey(proposal)))
     .map((proposal) => proposal.slot);
-  current = withDerivations({ ...current, proposals: state.proposals.filter((p) => !named.has(p.slot)) }, project);
+  const recordedSlots = new Set(recorded);
+  current = withDerivations({
+    ...current,
+    proposals: state.proposals.filter((proposal) => !recordedSlots.has(proposal.slot)),
+  }, project);
   // WHY: a fixed acknowledgement repeated across confirmations reads as a loop.
   // Naming the slots is how the requester sees the document actually moved.
   const message = recorded.length > 0

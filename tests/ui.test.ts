@@ -164,6 +164,38 @@ describe('Conversational UI API', () => {
     expect(complete).toHaveBeenCalledOnce();
   });
 
+  it('validates a human-edited proposal before confirming it', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['scope'];
+    const complete = vi.fn().mockResolvedValue({
+      answers: [],
+      proposals: [{
+        ruleId: 'scope-bounded',
+        slot: 'scope',
+        value: { include: ['mapping logic'], exclude: [] },
+        reason: 'the requester described mapping logic',
+      }],
+    });
+    await bind({ model: { complete } as ModelPort, initialDraft: draft });
+
+    const started = await post('/api/conversation/start', {});
+    const { sessionId } = await started.json() as { sessionId: string };
+    await post('/api/conversation/turn', { sessionId, message: 'Build a mapping tool.' });
+    const mappings = {
+      include: ['first name -> surname', 'last name -> forename'],
+      exclude: [],
+    };
+    const confirmed = await post('/api/conversation/confirm', {
+      sessionId,
+      proposals: [{ slot: 'scope', value: mappings }],
+    });
+
+    await expect(confirmed.json()).resolves.toEqual(expect.objectContaining({
+      status: 'sealed',
+      state: expect.objectContaining({ draft: expect.objectContaining({ scope: mappings }) }),
+    }));
+  });
+
   it('refuses a confirmation for a session it does not hold', async () => {
     const response = await post('/api/conversation/confirm', { sessionId: 'absent', slots: ['risk'] });
     expect(response.status).toBe(422);
