@@ -7,6 +7,22 @@ function request(): ModelRequest {
   return {
     messages: [{ role: 'user', content: 'There are no blocking decisions.' }],
     draft: { title: 'Example' },
+    focus: {
+      ruleId: 'blocking-decisions-declared',
+      slot: 'blockingDecisions',
+      question: 'Which decisions are still open and block this work? An empty list is an answer.',
+      entitlement: 'requester',
+      authorship: 'human_confirms',
+      consequence: 'routine',
+      valueSchema: { type: 'array' },
+      message: 'blockingDecisions must be explicitly declared',
+    },
+    proposals: [{
+      ruleId: 'constraints-declared',
+      slot: 'constraints',
+      value: [],
+      reason: 'the requester named no constraints',
+    }],
     missing: [{
       ruleId: 'blocking-decisions-declared',
       slot: 'blockingDecisions',
@@ -64,12 +80,21 @@ describe('Ollama model adapter', () => {
       think: false,
       keep_alive: '10m',
       format: expect.objectContaining({ type: 'object' }),
-      options: expect.objectContaining({ temperature: 0, num_predict: 4096 }),
+      options: expect.objectContaining({ temperature: 0, num_predict: 1024 }),
     }));
     expect(JSON.stringify(body)).toContain('blocking-decisions-declared');
     expect(JSON.stringify(body)).toContain('blockingDecisions');
+    expect(JSON.stringify(body)).toContain('pendingProposals');
+    expect(JSON.stringify(body)).toContain('focusGap');
+    expect(JSON.stringify(body)).toContain('the requester named no constraints');
     expect(JSON.stringify(body)).toContain('Never move a draft into answers yourself');
     expect(JSON.stringify(body)).toContain('Never claim that a specification is complete or sealed');
+    expect(JSON.stringify(body)).toContain('Do not fill unrelated gaps with generic defaults');
+    expect(JSON.stringify(body)).toContain('corrects a pending proposal');
+    expect(JSON.stringify(body)).toContain('Missing information is not an explicit empty list');
+    expect(JSON.stringify(body)).toContain('preserve every item separately');
+    expect(JSON.stringify(body)).toContain('Never copy a pendingProposals slot into answers');
+    expect(JSON.stringify(body['format'])).not.toContain('assistantMessage');
   });
 
   it('refuses an unavailable runtime', async () => {

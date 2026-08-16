@@ -8,7 +8,10 @@ import {
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:11434';
 const DEFAULT_TIMEOUT_MS = 300_000;
-const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+// One turn translates bounded slot values, not a document-sized answer. Keep
+// this aligned with README so a small local model cannot spend minutes filling
+// an output budget the application neither needs nor displays.
+const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
 /*
  * Ollama defaults this to 4096 and silently drops whatever does not fit — a
  * 33 KB conversation came back as prompt_eval_count=25 with a confident wrong
@@ -32,11 +35,10 @@ const valueEntry = {
 const proposalFormat = {
   type: 'object',
   properties: {
-    assistantMessage: { type: 'string', minLength: 1 },
-    answers: { type: 'array', maxItems: 64, items: valueEntry },
+    answers: { type: 'array', maxItems: 2, items: valueEntry },
     proposals: {
       type: 'array',
-      maxItems: 64,
+      maxItems: 2,
       items: {
         ...valueEntry,
         properties: { ...valueEntry.properties, reason: { type: 'string', minLength: 1 } },
@@ -44,7 +46,7 @@ const proposalFormat = {
       },
     },
   },
-  required: ['assistantMessage', 'answers', 'proposals'],
+  required: ['answers', 'proposals'],
   additionalProperties: false,
 } as const;
 
@@ -94,10 +96,18 @@ Produce the exact JSON type and shape that gap's valueSchema requires.
 answers: gaps the human actually answered or explicitly confirmed. Use only facts they stated.
 proposals: your own draft for gaps they did not answer, each with a short reason naming what in the
 conversation it rests on. A draft is a suggestion for a person to accept or correct, never an answer.
-Draft every gap you can reasonably infer; leave a gap out of both lists when you have nothing to go on.
+Prioritize facts in the latest human message, then focusGap. When the message corrects a pending proposal,
+return that revised proposal before unrelated gaps. Return no more than two entries total across answers
+and proposals. Do not fill unrelated gaps with generic defaults. Leave a gap out when you have
+no evidence. If a valueSchema requires several fields and the human did not explicitly supply every one,
+put the completed value in proposals, not answers. Missing information is not an explicit empty list.
+When the latest message enumerates items for an array field, preserve every item separately. Do not
+summarize concrete items into a generic category or keep an older, less specific pending list.
+Never copy a pendingProposals slot into answers. The application confirms those drafts separately; if
+the human changes one, return the revised value in proposals with a reason grounded in their correction.
 Never move a draft into answers yourself. Never invent identifiers, file paths, or test names.
 
-assistantMessage briefly says what you understood and what you drafted; do not ask another question.
+Return only answers and proposals. The application reports progress and asks the next question.
 Never claim that a specification is complete or sealed.`;
 
 export interface OllamaAdapterOptions {
@@ -201,7 +211,15 @@ export class OllamaAdapter implements ModelPort, SplitPort {
     return this.#ask(proposalFormat, [
       { role: 'system', content: systemPrompt },
       ...request.messages,
-      { role: 'system', content: JSON.stringify({ currentDraft: request.draft, gaps: request.missing }) },
+      {
+        role: 'system',
+        content: JSON.stringify({
+          currentDraft: request.draft,
+          pendingProposals: request.proposals,
+          focusGap: request.focus,
+          gaps: request.missing,
+        }),
+      },
     ]);
   }
 

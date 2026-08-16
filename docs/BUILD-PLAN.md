@@ -87,6 +87,7 @@ L2 and L3 exist and work. This repository is the missing front half.
 | **D29** | **The interviewer's prose is carried only when the ledger backs it.** A model summary is dropped unless the turn recorded an answer or kept a draft, and a confirmation names the slots it wrote. A requester cannot distinguish a fluent summary from a result, so an unbacked summary is a claim of progress the document does not support (D22). |
 | **D30** | **A model adapter declares its context window and refuses a reply that overran it.** A local runtime whose window cannot hold the prompt does not fail — it discards the oldest tokens, which are the instructions, and answers HTTP 200 anyway. The reply is fluent and grounded in nothing. Inheriting the runtime's default window is therefore a fail-open on the one input the kernel cannot re-derive: what the requester actually said. |
 | **D31** | **The parent intent a split traces to is derived from the sealed document, never re-elicited, and splitting is a capability a deployment may not have.** Re-asking for the parent would restart the authorship chain at whoever happens to be dividing the work (D22). `SplitPort` is separate from `ModelPort` so a deployment that only elicits one bounded change need not implement it — and one that cannot split refuses the route rather than sourcing a division from somewhere else. |
+| **D32** | **A pending model draft survives turns and can be approved only through the named human confirmation route.** The next model turn receives pending drafts but cannot copy one into `answers`; a correction returned through the wrong model channel remains a proposal. Explicit corrections focus only their named pending gap. When a small model still cannot translate one, the requester edits the drafted JSON and the same Rule validates it before confirmation. Model prose never narrates progress; the answer ledger does. |
 
 ## Known gaps, and what happens to each
 
@@ -467,6 +468,36 @@ the execution layer to receive.
 **Done when**: a sealed session returns either contracts that carry every
 criterion of the document, each tracing to it, or a reasoned verdict that the
 work is already one contract.
+
+---
+
+### S15 · A small-model interview keeps one coherent draft — **DONE**
+
+`branch: s15-coherent-interview-workflow`
+
+A live `qwen3.5:2b` data-mapping interview took more than 100 seconds for its
+first turn, forgot standing proposals, repeated stale narration, treated an
+inferred empty list as a human answer, and ignored a later four-item scope
+correction. Each output was structurally plausible; together they made the
+requester unable to finish one intake.
+
+- Pending proposals are part of every model request and survive silence in a
+  later response. The model cannot confirm them; only the named deterministic
+  confirmation route can move them into the document (D32).
+- Narration is derived from newly recorded answers, derivations, and changed
+  proposals. Out-of-order facts count as progress without changing Rule order.
+- Local extraction has a 1024-token output ceiling, an explicit focus gap, and
+  at most two answers plus two proposals. A correction that names a pending
+  slot receives only that slot's schema.
+- Partial compound values stay proposals. A correction returned through the
+  model's answer channel is downgraded to a proposal rather than trusted.
+- Draft JSON is editable before confirmation. An invalid edit remains pending;
+  a valid edit is rerun through its Rule and attributed to the confirming human.
+
+**Done when**: the same two-turn data-mapping request completes each inference
+inside the local budget, retains its scope draft across turns, never attributes
+an inferred value to the requester, and gives the requester a deterministic
+way to correct all four mappings when the configured 2b model cannot.
 
 ---
 

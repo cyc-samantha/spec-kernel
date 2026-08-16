@@ -19,7 +19,17 @@ export type ConversationMessage = z.infer<typeof conversationMessageSchema>;
 export interface ModelRequest {
   messages: readonly ConversationMessage[];
   draft: unknown;
+  focus: MissingItem;
   missing: readonly MissingItem[];
+  proposals: readonly PendingProposal[];
+}
+
+/** Machine drafts already shown to the requester but not yet confirmed. */
+export interface PendingProposal {
+  ruleId: string;
+  slot: string;
+  value: unknown;
+  reason: string;
 }
 
 /**
@@ -46,9 +56,11 @@ function duplicated(entries: readonly { ruleId: string; slot: string }[]): boole
 }
 
 export const modelProposalSchema = z.object({
-  assistantMessage: nonBlank,
-  answers: z.array(answerSchema).max(64),
-  proposals: z.array(draftedValueSchema).max(64).default([]),
+  // Accepted during migration from the original narrator-shaped port. The
+  // application deliberately ignores it; progress comes from its ledger.
+  assistantMessage: nonBlank.optional(),
+  answers: z.array(answerSchema).max(2),
+  proposals: z.array(draftedValueSchema).max(2).default([]),
 }).strict().superRefine((proposal, context) => {
   if (duplicated(proposal.answers)) {
     context.addIssue({ code: 'custom', path: ['answers'], message: 'answers must be unique' });
