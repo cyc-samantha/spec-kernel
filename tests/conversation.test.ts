@@ -214,6 +214,68 @@ describe('conversational specification intake', () => {
   });
 
   /*
+   * A rebuke for a gap the machine just answered for itself is the interview
+   * arguing with its own draft. The requester sees a value on offer and a
+   * complaint that they gave none.
+   */
+  it('invites confirmation of a fresh draft instead of rebuking the answer', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'Nothing else is blocked as far as I know.',
+      responses({
+        assistantMessage: 'I drafted the open-decision state.',
+        answers: [],
+        proposals: [{
+          ruleId: 'blocking-decisions-declared',
+          slot: 'blockingDecisions',
+          value: [],
+          reason: 'you said nothing else is blocked',
+        }],
+      }),
+    );
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'ask',
+      prompt: 'I drafted an answer for this. Confirm it above, or correct me here. Which decisions are still open and block this work? An empty list is an answer.',
+    }));
+  });
+
+  /*
+   * D10 still ends an interview that is going nowhere, but a standing draft
+   * buys the requester one turn: the second sighting of the same draft is not
+   * new information.
+   */
+  it('escalates a twice-ignored draft rather than offering it forever', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const drafted = {
+      assistantMessage: 'I drafted the open-decision state.',
+      answers: [],
+      proposals: [{
+        ruleId: 'blocking-decisions-declared',
+        slot: 'blockingDecisions',
+        value: [],
+        reason: 'you said nothing else is blocked',
+      }],
+    };
+    const model = responses(drafted, drafted, drafted);
+
+    let carried = state(draft);
+    const statuses: string[] = [];
+    for (const message of ['Nothing else is blocked.', 'As I said.', 'Same answer.']) {
+      const result = await converse(carried, project(), 'local-user', message, model);
+      carried = result.state;
+      statuses.push(result.status);
+    }
+
+    expect(statuses).toEqual(['ask', 'ask', 'blocking_decision']);
+  });
+
+  /*
    * D8: a machine may propose but may not answer its own question. A draft that
    * reached the document would let one seal-check pass content nobody authored.
    */
