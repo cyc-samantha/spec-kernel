@@ -245,6 +245,52 @@ describe('conversational specification intake', () => {
   });
 
   /*
+   * The translator narrates; the ledger decides. A turn that recorded nothing
+   * must not carry prose claiming it understood and drafted — the requester
+   * cannot tell a summary from a result.
+   */
+  it('drops a model summary the turn did not back with an answer or a draft', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'I am not sure.',
+      responses({
+        assistantMessage: 'I understood your request and drafted the remaining gaps.',
+        answers: [],
+        proposals: [],
+      }),
+    );
+
+    expect(result.state.messages.at(-1)?.content).toBe(
+      'That did not answer the question I asked. Which decisions are still open and block this work? An empty list is an answer.',
+    );
+  });
+
+  it('names the slots a confirmation recorded rather than repeating one line', () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    delete draft['constraints'];
+    const carried: ConversationState = {
+      ...state(draft),
+      proposals: [{
+        ruleId: 'constraints-declared',
+        slot: 'constraints',
+        question: 'q',
+        value: [],
+        reason: 'you named no constraint',
+        consequence: 'routine',
+        entitlement: 'requester',
+      }],
+    };
+    const result = confirmProposals(carried, project(), 'local-user', ['constraints']);
+
+    expect(result.state.messages.at(-1)?.content).toContain('I recorded constraints.');
+  });
+
+  /*
    * D10 still ends an interview that is going nowhere, but a standing draft
    * buys the requester one turn: the second sighting of the same draft is not
    * new information.
