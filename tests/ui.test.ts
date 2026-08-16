@@ -1,21 +1,32 @@
 import { readFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createUiServer } from '../ui/server.ts';
+import type { ModelPort } from '../ports/model.ts';
+import { createUiServer, type UiServerOptions } from '../ui/server.ts';
+import { validSpecification } from './fixtures/valid-specification.ts';
 
 let server: ReturnType<typeof createUiServer>;
 let baseUrl: string;
 
-beforeEach(async () => {
-  server = createUiServer();
+async function bind(options: UiServerOptions = {}): Promise<void> {
+  if (server?.listening) {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    });
+  }
+  server = createUiServer(options);
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
   });
   const address = server.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${address.port}`;
+}
+
+beforeEach(async () => {
+  await bind();
 });
 
 afterEach(async () => {
@@ -38,9 +49,10 @@ describe('Static Web UI assets', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
     const html = await response.text();
-    expect(html).toContain('Specification workspace');
-    expect(html).toContain('id="draft-input"');
-    expect(html).toContain('id="project-input"');
+    expect(html).toContain('RULE-DRIVEN INTERVIEW');
+    expect(html).toContain('id="intent-input"');
+    expect(html).not.toContain('id="draft-input"');
+    expect(html).not.toContain('id="project-input"');
   });
 
   it('renders untrusted values as text rather than HTML', async () => {
@@ -56,6 +68,86 @@ describe('Static Web UI assets', () => {
       draft: expect.objectContaining({ id: 'WC-EXAMPLE-01' }),
       project: expect.objectContaining({ version: 1 }),
     });
+  });
+});
+
+describe('Conversational UI API', () => {
+  it('opens with a Rule-derived prompt instead of a separately authored questionnaire', async () => {
+    const response = await post('/api/conversation/start', {});
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      status: 'ask',
+      missing: expect.objectContaining({ ruleId: 'required-slots' }),
+      prompt: 'What value belongs in each missing required specification slot?',
+      state: expect.objectContaining({
+        messages: [expect.objectContaining({
+          content: expect.stringContaining('What value belongs in each missing required specification slot?'),
+        })],
+      }),
+    }));
+  });
+
+  it('keeps session history on the server and seals an entitled natural-language answer', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const model: ModelPort = {
+      complete: vi.fn().mockResolvedValue({
+        assistantMessage: 'I recorded that no decisions remain.',
+        answers: [{
+          ruleId: 'blocking-decisions-declared',
+          slot: 'blockingDecisions',
+          value: [],
+        }],
+      }),
+    };
+    await bind({ model, modelLabel: 'Test model', initialDraft: draft });
+
+    const started = await post('/api/conversation/start', {});
+    expect(started.status).toBe(201);
+    const startBody = await started.json() as { sessionId: string };
+    const turn = await post('/api/conversation/turn', {
+      sessionId: startBody.sessionId,
+      message: 'There are no blocking decisions.',
+    });
+
+    expect(turn.status).toBe(200);
+    await expect(turn.json()).resolves.toEqual(expect.objectContaining({
+      status: 'sealed',
+      runtime: 'Test model',
+      state: expect.objectContaining({
+        draft: expect.objectContaining({ blockingDecisions: [] }),
+        answers: [expect.objectContaining({ answeredBy: 'local-user' })],
+      }),
+    }));
+  });
+
+  it('refuses an unknown session before calling the configured model', async () => {
+    const complete = vi.fn();
+    await bind({ model: { complete } });
+    const response = await post('/api/conversation/turn', {
+      sessionId: 'not-a-session',
+      message: 'Build an export screen.',
+    });
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'session_not_found' });
+    expect(complete).not.toHaveBeenCalled();
+  });
+
+  it('reports an unavailable model without changing the server-side draft', async () => {
+    const model: ModelPort = { complete: async () => { throw new Error('offline'); } };
+    await bind({ model });
+    const started = await post('/api/conversation/start', {});
+    const startBody = await started.json() as { sessionId: string };
+    const response = await post('/api/conversation/turn', {
+      sessionId: startBody.sessionId,
+      message: 'Build an export screen.',
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      status: 'refused',
+      reason: 'the configured model is unavailable',
+      state: expect.objectContaining({ draft: {} }),
+    }));
   });
 });
 

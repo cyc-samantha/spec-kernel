@@ -3,74 +3,67 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Specification workspace</title>
+    <title>Spec Kernel · Clarify work before execution</title>
     <link rel="stylesheet" href="/styles.css">
     <script src="/app.js" defer></script>
   </head>
   <body>
     <header class="masthead">
-      <div>
-        <p class="eyebrow">SPEC KERNEL · LOCAL WORKSPACE</p>
-        <h1>Turn intent into a contract<br>another team can trust.</h1>
-      </div>
-      <div class="local-mark"><span></span> Local · deterministic</div>
+      <a class="brand" href="/" aria-label="Spec Kernel home">
+        <span class="brand-mark">SK</span>
+        <span>Spec Kernel</span>
+      </a>
+      <div class="runtime"><span id="runtime-light"></span><span id="runtime-label">Connecting to model…</span></div>
     </header>
 
-    <main>
-      <section class="workspace" aria-label="Specification inputs">
-        <div class="panel draft-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="step">01 · ASSERT</p>
-              <h2>Specification draft</h2>
-            </div>
-            <button id="load-example" class="button quiet" type="button">Load example</button>
+    <main class="shell">
+      <aside class="context-panel" aria-label="Specification progress">
+        <p class="eyebrow">SPECIFICATION INTAKE</p>
+        <h1>Make the work clear<br>before Agents begin.</h1>
+        <p class="intro">Describe what you need in your own words. The interviewer follows the kernel’s deterministic gaps and stops only when the contract is ready—or needs a named handoff.</p>
+
+        <div class="progress-card">
+          <div class="progress-heading">
+            <span>Readiness</span>
+            <span id="status-badge" class="status ready">READY</span>
           </div>
-          <label class="sr-only" for="draft-input">Specification draft JSON</label>
-          <textarea id="draft-input" spellcheck="false" aria-describedby="draft-help"></textarea>
-          <p id="draft-help" class="hint">Edit the document directly. Missing values remain missing—nothing here guesses.</p>
+          <p id="progress-summary">Start with the outcome you want.</p>
+          <ol id="missing-list" class="missing-list"></ol>
         </div>
 
-        <aside class="panel control-panel">
+        <details class="draft-card">
+          <summary>View current specification</summary>
+          <pre id="draft-output">{}</pre>
+          <button id="download-spec" class="text-button" type="button" hidden>Download specification</button>
+        </details>
+      </aside>
+
+      <section class="chat-panel" aria-labelledby="chat-title">
+        <div class="chat-heading">
           <div>
-            <p class="step">02 · CHECK</p>
-            <h2>Deterministic verdict</h2>
-            <p class="lede">The same rules serve both entry paths. No model grades the result.</p>
+            <p class="eyebrow">RULE-DRIVEN INTERVIEW</p>
+            <h2 id="chat-title">Tell me what you want to accomplish</h2>
           </div>
-
-          <div class="actions">
-            <button id="check-draft" class="button primary" type="button">Run seal-check</button>
-            <button id="next-question" class="button secondary" type="button">Get next question</button>
-          </div>
-
-          <details>
-            <summary>Project declaration</summary>
-            <label class="sr-only" for="project-input">Project declaration JSON</label>
-            <textarea id="project-input" class="project-input" spellcheck="false"></textarea>
-          </details>
-        </aside>
-      </section>
-
-      <section class="result-panel" aria-live="polite" aria-labelledby="result-title">
-        <div class="result-heading">
-          <div>
-            <p class="step">03 · HAND OFF</p>
-            <h2 id="result-title">Ready to check</h2>
-          </div>
-          <span id="status-badge" class="status idle">Not run</span>
+          <button id="new-session" class="button quiet" type="button">New conversation</button>
         </div>
-        <p id="result-summary" class="result-summary">Load the example or paste a specification, then run seal-check.</p>
-        <div id="question-card" class="question-card" hidden>
-          <p class="question-label">NEXT QUESTION</p>
-          <p id="question-text"></p>
-        </div>
-        <ol id="missing-list" class="missing-list"></ol>
-        <pre id="raw-output" class="raw-output" hidden></pre>
+
+        <div id="conversation" class="conversation" aria-live="polite"></div>
+
+        <form id="composer" class="composer">
+          <label class="sr-only" for="intent-input">Your answer</label>
+          <textarea id="intent-input" rows="3" maxlength="20000" placeholder="For example: I need customers to export their invoices as CSV…" required></textarea>
+          <div class="composer-footer">
+            <span>Enter to send · Shift+Enter for a new line</span>
+            <button id="send-message" class="button primary" type="submit">Send</button>
+          </div>
+        </form>
+        <div id="error-card" class="error-card" role="alert" hidden></div>
       </section>
     </main>
 
     <footer>
-      <span>Human intent in</span><span class="line"></span><span>sealed specification out</span>
+      <span>The model translates. The kernel decides readiness.</span>
+      <span>Local by default · Provider replaceable</span>
     </footer>
   </body>
 </html>
