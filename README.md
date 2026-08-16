@@ -123,6 +123,8 @@ Runtime selection is configuration, not kernel code:
 | `SPEC_MODEL_ADAPTER` | `ollama` | application adapter selector |
 | `SPEC_MODEL_NAME` | `qwen3.5:4b` | runtime model identifier |
 | `SPEC_MODEL_URL` | `http://127.0.0.1:11434` | model HTTP endpoint |
+| `SPEC_MODEL_TIMEOUT_MS` | `300000` | deadline including a cold model load |
+| `SPEC_MODEL_MAX_OUTPUT_TOKENS` | `1024` | ceiling for one structured proposal |
 | `SPEC_USER_ID` | `local-user` | named answer author for the local project |
 | `SPEC_TARGET_REPOSITORY` | `local-project` | repository receiving the specification |
 | `SPEC_UI_PORT` | `3000` | loopback UI port |
@@ -131,6 +133,15 @@ For an enterprise deployment, implement `ModelPort` for the approved runtime and
 inject it into `createUiServer({ model })`. The conversation, entitlement,
 provenance, Rule questions, and seal-check do not change. Provider credentials
 belong in that deployment adapter or its secret manager, never in `kernel/`.
+
+The Ollama adapter disables unbounded thinking for structured extraction, caps
+generated tokens, and keeps the model warm for ten minutes. It receives the
+machine-readable specification schema so a small local model does not have to
+guess slot shapes. A deadline is reported as `model request timed out`;
+`model unavailable` is reserved for a runtime that cannot be reached.
+
+The UI process does not hot-reload source or environment variables. After an
+update or configuration change, stop it with `Ctrl+C` and run `npm run ui` again.
 
 The browser remains plain HTML, CSS, and JavaScript under `ui/public/`; there is
 no framework, bundler, or build step.
