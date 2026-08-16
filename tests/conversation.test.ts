@@ -627,6 +627,38 @@ describe('conversational specification intake', () => {
     expect(result.state.messages.at(-1)?.content).toContain('confirm authority');
   });
 
+  /*
+   * The deadlock's second half. Refusing a bare yes is right, but the refusal
+   * left the attempt ledger untouched, so the stall D10 exists to catch could
+   * repeat forever: the escape hatch cannot open on a loop it never sees.
+   */
+  it('counts a refused agreement as an attempt that yielded nothing', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['irreversibility'];
+    const carried: ConversationState = {
+      ...state(draft),
+      proposals: [{
+        ruleId: 'irreversibility-classified',
+        slot: 'irreversibility',
+        question: 'If this goes wrong, is it a refactor to revert, a migration to unwind, or a rewrite?',
+        value: 'refactor',
+        reason: 'drafted from the described change',
+        consequence: 'authority',
+        entitlement: 'requester',
+      }],
+    };
+    const complete = vi.fn();
+
+    const once = await converse(carried, project(), 'local-user', 'yes', { complete });
+    const twice = await converse(once.state, project(), 'local-user', 'yes', { complete });
+
+    expect(complete).not.toHaveBeenCalled();
+    expect(once.state.attempts).toEqual([
+      expect.objectContaining({ slot: 'irreversibility', yieldedNewInformation: false }),
+    ]);
+    expect(twice.status).toBe('blocking_decision');
+  });
+
   it('records a confirmed draft as the confirming person answer', async () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['blockingDecisions'];

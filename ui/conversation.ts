@@ -1,6 +1,6 @@
 import { recordAnswer, recordDerivation, type SlotAnswer } from '../kernel/answers.ts';
 import { deriveSlot, hasDerivation } from '../kernel/derivations.ts';
-import { advanceInterview, type InterviewAttempt } from '../kernel/interview.ts';
+import { advanceInterview, questionFor, type InterviewAttempt } from '../kernel/interview.ts';
 import { sealCheck, type MissingItem } from '../kernel/seal-check.ts';
 import type { Consequence, Entitlement, RuleId } from '../kernel/rules.ts';
 import type { ProjectDeclaration } from '../ports/project.ts';
@@ -345,7 +345,7 @@ function promptFor(
 ): string {
   const drafted = state.proposals.some((proposal) => gapKey(proposal) === gapKey(step.missing));
   if (!drafted) return step.prompt;
-  return `I drafted an answer for this. Confirm it above, or correct me here. ${step.missing.question}`;
+  return `I drafted an answer for this. Confirm it above, or correct me here. ${questionFor(step.missing)}`;
 }
 
 /*
@@ -376,7 +376,7 @@ function askResult(
   progressMessage: string,
   explained = false,
 ): ConversationResult {
-  const prompt = explained ? step.missing.question : promptFor(state, step);
+  const prompt = explained ? questionFor(step.missing) : promptFor(state, step);
   return {
     status: 'ask',
     state: withAssistant(state, [progressMessage, prompt].filter(Boolean).join('\n\n')),
@@ -384,6 +384,27 @@ function askResult(
     prompt,
     proposals: state.proposals,
   };
+}
+
+/*
+ * Every route out of a turn ends the same way: ask the next Rule question,
+ * unless a terminal status has replaced it. Naming that once is what stops a
+ * route from bypassing the check that turns a repeated question into a
+ * blocking decision — the loop D10 exists to break.
+ */
+function resolveTurn(
+  state: ConversationState,
+  project: ProjectDeclaration,
+  identity: string,
+  said: { narration: string; refused?: readonly string[] },
+): ConversationResult {
+  const step = nextStep(state, project, identity);
+  const terminal = terminalResult(step, state, said.narration);
+  if (terminal) return terminal;
+  if (step.status !== 'ask') {
+    return { status: 'refused', state, reason: 'the next Rule question could not be selected' };
+  }
+  return askResult(state, step, said.narration, said.refused?.includes(step.missing.slot) ?? false);
 }
 
 function sameProposal(left: SlotProposal | undefined, right: SlotProposal): boolean {
@@ -481,8 +502,20 @@ export async function converse(
   }
   const spoken = readConfirmation(userMessage, current.proposals);
   if (spoken.kind === 'confirms') return confirmProposals(current, project, identity, spoken.slots);
+  /*
+   * Refusing a bare yes is right, but the refusal has to reach the ledger. A
+   * requester who keeps agreeing to a grant they must name is going nowhere,
+   * and a stall nobody records is a loop the escape hatch never sees.
+   */
   if (spoken.kind === 'needs_naming') {
-    return askResult(current, initialStep, authorityNaming(spoken.slots));
+    const stalled = withAttempt(
+      current,
+      initialStep.missing,
+      initialStep.prompt,
+      proposalsBefore,
+      current.answers.length,
+    );
+    return resolveTurn(stalled, project, identity, { narration: authorityNaming(spoken.slots) });
   }
   /*
    * Agreement with nothing standing carries no information either way. Sending
@@ -553,13 +586,7 @@ export async function converse(
   const narration = [progress, misfitMessage(applied.refused)].filter(Boolean).join(' ')
     || (correctionIsNew ? untranslated(focus.slot) : '');
 
-  const step = nextStep(current, project, identity);
-  const terminal = terminalResult(step, current, narration);
-  if (terminal) return terminal;
-  if (step.status !== 'ask') {
-    return { status: 'refused', state: current, reason: 'the next Rule question could not be selected' };
-  }
-  return askResult(current, step, narration, applied.refused.includes(step.missing.slot));
+  return resolveTurn(current, project, identity, { narration, refused: applied.refused });
 }
 
 function confirmOne(
@@ -608,11 +635,5 @@ export function confirmProposals(
     ? `I recorded ${recorded.join(', ')}.`
     : 'I could not record any of the values you named.';
 
-  const step = nextStep(current, project, identity);
-  const terminal = terminalResult(step, current, message);
-  if (terminal) return terminal;
-  if (step.status !== 'ask') {
-    return { status: 'refused', state: current, reason: 'the next Rule question could not be selected' };
-  }
-  return askResult(current, step, message);
+  return resolveTurn(current, project, identity, { narration: message });
 }

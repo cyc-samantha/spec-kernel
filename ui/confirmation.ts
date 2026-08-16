@@ -26,6 +26,13 @@ const FILLERS = new Set([
 // long message from ever being read as one because of a stray "ok" inside it.
 const MAX_WORDS = 8;
 
+/*
+ * Where one message stops being one act. A period is deliberately absent: `yes.
+ * but change scope` must stay a single reading, or the first half would grant
+ * the value the second half is replacing.
+ */
+const BETWEEN_ACTS = /[\n,;?!"']+/;
+
 function words(text: string): string[] {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
 }
@@ -46,14 +53,39 @@ function decide(candidates: readonly SlotProposal[], named: boolean): Confirmati
   return { kind: 'needs_naming', slots: candidates.map((item) => item.slot) };
 }
 
-/** Reads agreement, and only agreement, out of one typed message. */
-export function readConfirmation(message: string, proposals: readonly SlotProposal[]): ConfirmationRead {
-  const spoken = words(message);
-  if (spoken.length === 0 || spoken.length > MAX_WORDS) return { kind: 'none' };
+type SegmentRead = { agrees: false } | { agrees: true; named: readonly SlotProposal[] };
+
+/** Agreement in one uninterrupted act, and the standing drafts it named. */
+function readSegment(segment: string, proposals: readonly SlotProposal[]): SegmentRead {
+  const spoken = words(segment);
+  if (spoken.length === 0 || spoken.length > MAX_WORDS) return { agrees: false };
   const named = namedIn(spoken, proposals);
   const slotNames = new Set(named.flatMap((proposal) => slotWords(proposal.slot)));
   const rest = spoken.filter((word) => !slotNames.has(word));
-  if (!rest.some((word) => AGREEMENTS.has(word))) return { kind: 'none' };
-  if (!rest.every((word) => AGREEMENTS.has(word) || FILLERS.has(word))) return { kind: 'none' };
-  return decide(named.length > 0 ? named : proposals, named.length > 0);
+  if (!rest.some((word) => AGREEMENTS.has(word))) return { agrees: false };
+  if (!rest.every((word) => AGREEMENTS.has(word) || FILLERS.has(word))) return { agrees: false };
+  return { agrees: true, named };
+}
+
+/*
+ * A person writes one message, not one act: the turn that deadlocked carried a
+ * question and `"confirm irreversibility", "confirm risk"` together. Naming the
+ * slot is what lets a grant survive its surroundings — a segment that agrees
+ * without naming anything contributes nothing, so a bare "yes" still needs the
+ * whole message to be short.
+ */
+function namedGrants(message: string, proposals: readonly SlotProposal[]): string[] {
+  const granted = message.split(BETWEEN_ACTS).flatMap((segment) => {
+    const read = readSegment(segment, proposals);
+    return read.agrees ? read.named.map((proposal) => proposal.slot) : [];
+  });
+  return [...new Set(granted)];
+}
+
+/** Reads agreement, and only agreement, out of one typed message. */
+export function readConfirmation(message: string, proposals: readonly SlotProposal[]): ConfirmationRead {
+  const whole = readSegment(message, proposals);
+  if (whole.agrees) return decide(whole.named.length > 0 ? whole.named : proposals, whole.named.length > 0);
+  const granted = namedGrants(message, proposals);
+  return granted.length > 0 ? { kind: 'confirms', slots: granted } : { kind: 'none' };
 }

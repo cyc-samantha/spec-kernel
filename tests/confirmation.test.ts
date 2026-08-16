@@ -70,6 +70,41 @@ describe('reading a confirmation out of what a person typed', () => {
     });
   });
 
+  /*
+   * The live deadlock. A person wrote a question and `"confirm irreversibility",
+   * "confirm risk"` in one message; the length gate threw the grant away with
+   * the question, and nothing they typed afterwards could reach the draft again.
+   */
+  it('reads a grant that names its slot out of a longer message', () => {
+    const message = 'do you no need to include upload section in scope? this is also a task?'
+      + '   "confirm irreversibility", "confirm risk"';
+    expect(readConfirmation(message, [
+      proposal('irreversibility', 'authority'),
+      proposal('risk', 'authority'),
+    ])).toEqual({ kind: 'confirms', slots: ['irreversibility', 'risk'] });
+  });
+
+  it('grants only the slot a segment names, and refuses the one it declines', () => {
+    expect(readConfirmation('no irreversibility, confirm risk', [
+      proposal('irreversibility', 'authority'),
+      proposal('risk', 'authority'),
+    ])).toEqual({ kind: 'confirms', slots: ['risk'] });
+  });
+
+  /*
+   * The fail-closed line for reading a message in parts. A bare agreement is not
+   * an act a segment can carry, or `yes, but change scope` would record the very
+   * value the person was in the middle of replacing.
+   */
+  it('refuses a bare agreement in one part of a message that corrects in another', () => {
+    expect(readConfirmation('yes, but change scope', [proposal('scope')])).toEqual({ kind: 'none' });
+    expect(readConfirmation('ok\nactually the scope is wrong', [proposal('scope')])).toEqual({ kind: 'none' });
+  });
+
+  it('refuses a named slot the message declines to confirm', () => {
+    expect(readConfirmation('i cannot confirm scope yet', [proposal('scope')])).toEqual({ kind: 'none' });
+  });
+
   /** Unevaluable input: nothing to read it from. */
   it('refuses a blank message', () => {
     expect(readConfirmation('   ', [proposal('scope')])).toEqual({ kind: 'none' });
