@@ -79,6 +79,31 @@ describe('conversational specification intake', () => {
     expect(complete).toHaveBeenCalledOnce();
   });
 
+  /*
+   * The translator answers at most two gaps per turn out of up to eleven on
+   * offer. A live intake spent four turns without ever drafting the title,
+   * because the gap being asked was one entry in a list it could rank freely.
+   */
+  it('offers the gap it is asking about first', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['title'];
+    delete draft['constraints'];
+    delete draft['blockingDecisions'];
+    let seen: readonly { slot: string }[] = [];
+
+    await converse(state(draft), project(), 'local-user', 'A tool that maps columns.', {
+      complete: async (request) => {
+        seen = request.missing;
+        return { answers: [], proposals: [] };
+      },
+    });
+
+    expect(seen[0]?.slot).toBe('title');
+    expect(seen.map((item) => item.slot)).toEqual(
+      expect.arrayContaining(['title', 'constraints', 'blockingDecisions']),
+    );
+  });
+
   it('gives each gap its own slot schema instead of asking the translator to guess shapes', async () => {
     let gaps: readonly { slot: string; valueSchema: unknown }[] = [];
     const model: ModelPort = {

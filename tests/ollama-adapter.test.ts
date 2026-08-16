@@ -81,6 +81,7 @@ describe('Ollama model adapter', () => {
     expect(JSON.stringify(body)).toContain('blockingDecisions');
     expect(JSON.stringify(body)).toContain('slotsAlreadyDrafted');
     expect(JSON.stringify(body)).toContain('focusGap');
+    expect(JSON.stringify(body)).toContain('Always\\nreturn an entry for it');
     // A drafted value in view anchors a small model onto it: the same turn that
     // reported four column mappings returned one when the draft was included.
     expect(JSON.stringify(body)).not.toContain('the requester named no constraints');

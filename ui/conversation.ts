@@ -471,7 +471,10 @@ export async function converse(
       messages: current.messages,
       draft: current.draft,
       focus,
-      missing: [...presented.values()],
+      // The gap being asked leads the list it appears in: a translator with a
+      // two-entry budget ranks what it is given, and last is where a gap goes
+      // unanswered for four turns.
+      missing: [focus, ...[...presented.values()].filter((item) => gapKey(item) !== gapKey(focus))],
       drafted: current.proposals.map((proposal) => proposal.slot),
     });
   } catch (error) {
