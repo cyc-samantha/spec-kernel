@@ -79,6 +79,8 @@ L2 and L3 exist and work. This repository is the missing front half.
 | **D21** | One contract targets exactly **one repository**. Cross-repository work is split into a parent intent and one contract per repository, each sealed separately. |
 | **D22** | The source rule is about provenance, not traffic: **every contract traces, by an unbroken chain of named authorship, to a human intent that came through a door.** Not "every contract walks a door" — a split (1 intent → N contracts), a mechanical sweep (one door-walk defines a policy, many instances follow), and a learning-loop proposal (a human carries it through the door) all satisfy it. |
 | **D23** | The real risk to D22 is not agents originating work — it is somebody adding a convenience endpoint to L2. **The ledger must accept contracts from exactly one source, and an anti-entropy test in `agent-ticket-system` must say so.** Not this repository's slice, but do not lose it. |
+| **D24** | Model use is an **optional application concern behind `ModelPort`**. The kernel never knows a provider, model name, protocol, or availability state. A hobby deployment may use a local runtime; an enterprise deployment replaces only the adapter. |
+| **D25** | A model returns candidate values for Rule-owned gaps, never a seal verdict. The application matches each candidate to an offered gap, checks entitlement and named authorship, applies it in isolation, then reruns deterministic seal-check. Malformed, unavailable, or out-of-scope model output is refused. |
 
 ## Known gaps, and what happens to each
 
@@ -323,6 +325,32 @@ is refused, and `npm run ui` serves the browser surface locally.
 
 ---
 
+### S10 · Adaptable conversational runtime — **DONE**
+
+`branch: s10-conversational-runtime`
+
+The browser entry point is natural language rather than a JSON workbench. Its
+server-side session holds the evolving draft, authorship, and attempt history;
+the browser cannot submit a replacement history. Each human turn is translated
+into candidate values for the currently offered Rule gaps, and one inference may
+cover several gaps so local hardware does not pay one inference per slot.
+
+- `ports/model.ts` is the provider-neutral boundary.
+- `adapters/ollama.ts` is the first replaceable adapter and uses native `fetch`.
+- No provider SDK or new runtime package is installed.
+- The model cannot choose an unoffered slot and cannot return `sealed`.
+- Offline, malformed, oversized, duplicate, or out-of-scope model output refuses
+  without advancing the draft.
+- A locally entitled identity may fill both requester and technical-author gaps;
+  otherwise the same workflow ends in the successful technical handoff from D16.
+
+**Done when**: a browser user starts with prose, the conversation displays only
+Rule-derived questions, an entitled answer reaches the deterministic sealed
+state through the same kernel functions, and an unavailable model leaves the
+draft unsealed with a clear error.
+
+---
+
 ## Deliberately not built
 
 Written down so nobody rediscovers them mid-build.
@@ -334,5 +362,7 @@ Written down so nobody rediscovers them mid-build.
 - **In-flight overlap detection.** Wait for ten contracts a day.
 - **Pricing vagueness back to the requester.** Wait for abuse data.
 - **Any change to L2.** Output feeds the existing adapter.
+- **Enterprise model adapters.** `ModelPort` is stable; add the adapter when a
+  deployment names its approved runtime rather than guessing one in the kernel.
 - **Execution basis / envelope.** Already done in `lite-harness/engine/envelope.ts`
   — this is not a gap.
