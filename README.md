@@ -3,9 +3,10 @@
 The specification layer. A human intent goes in; a contract an agent team can
 claim comes out.
 
-It executes nothing, holds no credentials, and calls no service. It decides only
-one thing: whether a description of work is complete enough to hand to somebody
-who was not in the conversation.
+It executes no target work, holds no credentials, and calls no service. Its
+authoritative verdict is whether a description of work is complete enough to
+hand to somebody who was not in the conversation. Local deterministic CLIs
+expose that verdict and append learning records; none invokes a model.
 
 ## The finish line is not defined here
 
@@ -44,11 +45,44 @@ reveal which door it came through.
 The questions are not authored. They are derived from the checks: a question
 exists exactly when there is a downstream refusal it prevents.
 
-## Status
+The workflow packaging is model- and vendor-neutral: each door is a plain
+`SKILL.md`, while every verdict remains TypeScript that can run without a model.
 
-Early. `docs/BUILD-PLAN.md` carries the decision ledger and the remaining slices.
+## What ships
+
+| Surface | Purpose |
+|---|---|
+| `kernel/specification.ts` | the slot schema handed toward execution |
+| `kernel/rules.ts` | each deterministic check, question, and entitlement in one object |
+| `kernel/seal-check.ts` | the complete missing-item verdict |
+| `ports/project.ts` | repository boundary, entitlement identities, and signer |
+| `skills/draft-specification/` | assert-first intake |
+| `skills/elicit-specification/` | elicit-first intake driven only by missing items |
+| `kernel/outcomes.ts` | append-only green-but-wrong learning signal |
+| `kernel/split.ts` | split proposal validation by dependence and repository boundary |
+
+## Run it
+
+Install and verify the kernel:
 
 ```bash
 npm install
 npm run check
 ```
+
+Check a structured draft directly:
+
+```bash
+node bin/seal-check.ts examples/engineer-draft.output.json
+```
+
+The command exits zero only for a sealed specification and prints every missing
+item otherwise. `bin/interview.ts`, `bin/record-outcome.ts`, and `bin/split.ts`
+expose the other deterministic surfaces; run any without arguments to see its
+required files.
+
+## Status
+
+The v0.1 MVP is complete: slices S0–S8 are implemented and recorded in
+`docs/BUILD-PLAN.md`. Profile and Shape still deliberately ship with no
+mechanism; they wait for a real cross-project conflict.

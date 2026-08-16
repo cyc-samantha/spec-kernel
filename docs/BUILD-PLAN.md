@@ -5,7 +5,7 @@ pick this up and continue. Read it before changing anything.
 
 Part 1 is the decision ledger. It is the acceptance criteria for every slice; when
 a question comes up mid-build, look it up here rather than re-deciding it. Part 2
-is the engineering contract. Part 3 is the remaining work.
+is the engineering contract. Part 3 is the completed slice history.
 
 ---
 
@@ -122,7 +122,7 @@ Every commit is green.
 
 ---
 
-# Part 3 — Slices
+# Part 3 — Slice history
 
 Order matters. **S0 → S1 → S2 is a straight line with nothing inserted into it**:
 until the rules exist and S2 has locked them down, no skill should exist, or the
