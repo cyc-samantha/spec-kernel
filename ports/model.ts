@@ -19,6 +19,7 @@ export type ConversationMessage = z.infer<typeof conversationMessageSchema>;
 export interface ModelRequest {
   messages: readonly ConversationMessage[];
   draft: unknown;
+  focus: MissingItem;
   missing: readonly MissingItem[];
   proposals: readonly PendingProposal[];
 }
@@ -58,8 +59,8 @@ export const modelProposalSchema = z.object({
   // Accepted during migration from the original narrator-shaped port. The
   // application deliberately ignores it; progress comes from its ledger.
   assistantMessage: nonBlank.optional(),
-  answers: z.array(answerSchema).max(64),
-  proposals: z.array(draftedValueSchema).max(64).default([]),
+  answers: z.array(answerSchema).max(4),
+  proposals: z.array(draftedValueSchema).max(4).default([]),
 }).strict().superRefine((proposal, context) => {
   if (duplicated(proposal.answers)) {
     context.addIssue({ code: 'custom', path: ['answers'], message: 'answers must be unique' });

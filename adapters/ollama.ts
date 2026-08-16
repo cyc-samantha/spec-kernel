@@ -35,10 +35,10 @@ const valueEntry = {
 const proposalFormat = {
   type: 'object',
   properties: {
-    answers: { type: 'array', maxItems: 64, items: valueEntry },
+    answers: { type: 'array', maxItems: 4, items: valueEntry },
     proposals: {
       type: 'array',
-      maxItems: 64,
+      maxItems: 4,
       items: {
         ...valueEntry,
         properties: { ...valueEntry.properties, reason: { type: 'string', minLength: 1 } },
@@ -96,7 +96,8 @@ Produce the exact JSON type and shape that gap's valueSchema requires.
 answers: gaps the human actually answered or explicitly confirmed. Use only facts they stated.
 proposals: your own draft for gaps they did not answer, each with a short reason naming what in the
 conversation it rests on. A draft is a suggestion for a person to accept or correct, never an answer.
-Draft every gap you can reasonably infer; leave a gap out of both lists when you have nothing to go on.
+Prioritize focusGap and facts in the latest human message. Return no more than four answers and four
+proposals. Do not fill unrelated gaps with generic defaults. Leave a gap out when you have no evidence.
 Never move a draft into answers yourself. Never invent identifiers, file paths, or test names.
 
 Return only answers and proposals. The application reports progress and asks the next question.
@@ -208,6 +209,7 @@ export class OllamaAdapter implements ModelPort, SplitPort {
         content: JSON.stringify({
           currentDraft: request.draft,
           pendingProposals: request.proposals,
+          focusGap: request.focus,
           gaps: request.missing,
         }),
       },

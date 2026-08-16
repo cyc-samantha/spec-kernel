@@ -59,6 +59,20 @@ describe('model port response boundary', () => {
     });
   });
 
+  it('refuses an unbounded batch from a model turn', () => {
+    expect(loadModelProposal({
+      answers: Array.from({ length: 5 }, (_, index) => ({
+        ruleId: `rule-${index}`,
+        slot: `slot-${index}`,
+        value: index,
+      })),
+      proposals: [],
+    })).toEqual({
+      ok: false,
+      reason: 'the model response did not match the proposal schema',
+    });
+  });
+
   it('refuses output that cannot be evaluated', () => {
     const unreadable = new Proxy({}, { get: () => { throw new Error('unreadable'); } });
     expect(loadModelProposal(unreadable)).toEqual({

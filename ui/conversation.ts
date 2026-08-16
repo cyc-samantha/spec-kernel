@@ -378,6 +378,7 @@ export async function converse(
     raw = await model.complete({
       messages: current.messages,
       draft: current.draft,
+      focus: initialStep.missing,
       missing: [...offered.values()],
       proposals: current.proposals,
     });
