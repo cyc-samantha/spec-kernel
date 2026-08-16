@@ -293,6 +293,13 @@ describe('checked-in UI source', () => {
     const html = readFileSync(new URL('../ui/public/index.html', import.meta.url), 'utf8');
     expect(html).not.toMatch(/https?:\/\//);
   });
+
+  it('lets a person edit drafted JSON before the confirmation request', () => {
+    const script = readFileSync(new URL('../ui/public/app.js', import.meta.url), 'utf8');
+    expect(script).toContain("value.className = 'proposal-value'");
+    expect(script).toContain('JSON.parse(editor.value)');
+    expect(script).toContain("{ sessionId, proposals }");
+  });
 });
 
 describe('splitting a sealed session into claimable contracts', () => {

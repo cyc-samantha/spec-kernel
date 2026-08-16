@@ -132,11 +132,24 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 20px
   border-left: 3px solid #b4530a;
 }
 
-.proposal code {
+.proposal code,
+.proposal-value {
   display: block;
   margin-top: 0.15rem;
   font-size: 0.82rem;
   word-break: break-word;
+}
+
+.proposal-value {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line, #d8d8d8);
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: var(--surface, #fff);
+  color: inherit;
 }
 
 .proposal-reason {

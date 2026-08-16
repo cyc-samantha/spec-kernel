@@ -42,8 +42,12 @@ function proposalRow(proposal) {
   const label = document.createElement('div');
   const slot = document.createElement('strong');
   slot.textContent = proposal.slot;
-  const value = document.createElement('code');
-  value.textContent = JSON.stringify(proposal.value);
+  const value = document.createElement('textarea');
+  value.className = 'proposal-value';
+  value.rows = 4;
+  value.spellcheck = false;
+  value.value = JSON.stringify(proposal.value, null, 2);
+  value.setAttribute('aria-label', `Edit ${proposal.slot} JSON value`);
   const reason = document.createElement('p');
   reason.className = 'proposal-reason';
   reason.textContent = proposal.reason;
@@ -57,8 +61,13 @@ function renderProposals(proposals = []) {
   proposalList.replaceChildren(...proposals.map(proposalRow));
 }
 
-function checkedSlots() {
-  return [...proposalList.querySelectorAll('input:checked')].map((box) => box.value);
+function checkedProposals() {
+  return [...proposalList.querySelectorAll('.proposal')].flatMap((row) => {
+    const box = row.querySelector('input:checked');
+    if (!box) return [];
+    const editor = row.querySelector('.proposal-value');
+    return [{ slot: box.value, value: JSON.parse(editor.value) }];
+  });
 }
 
 function showError(message) {
@@ -186,14 +195,15 @@ async function sendMessage() {
 }
 
 async function confirmSelected() {
-  const slots = checkedSlots();
-  if (!slots.length || !sessionId) return;
+  if (!sessionId) return;
   setBusy(true);
   clearError();
   try {
-    render(await post('/api/conversation/confirm', { sessionId, slots }));
+    const proposals = checkedProposals();
+    if (!proposals.length) return;
+    render(await post('/api/conversation/confirm', { sessionId, proposals }));
   } catch (error) {
-    showError(`The confirmation could not be recorded: ${error.message}`);
+    showError(`The confirmation could not be recorded. Check the edited JSON values: ${error.message}`);
   } finally {
     setBusy(false);
   }
