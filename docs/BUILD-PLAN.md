@@ -83,6 +83,8 @@ L2 and L3 exist and work. This repository is the missing front half.
 | **D25** | A model returns candidate values for Rule-owned gaps, never a seal verdict. The application matches each candidate to an offered gap, checks entitlement and named authorship, applies it in isolation, then reruns deterministic seal-check. Malformed, unavailable, or out-of-scope model output is refused. |
 | **D26** | **A requester is never asked to produce a value from nothing.** Every open slot is either *derived* — one correct value follows from what is already declared, so nobody is asked — or *drafted* by the model with the reason it rests on, for a person to confirm or correct. A draft is held beside the document until confirmed; confirmation is deterministic and must name each slot it accepts. Machine-authored is not machine-approved. |
 | **D27** | **`risk`, `irreversibility`, and `authority` are marked `consequence: authority` and can never be `machine_derives`.** They decide how much damage an agent may do unsupervised. A machine that fills them silently has granted itself the permission, and seal-check passes it because the field has a value (D14). The UI renders them apart and unticked; the kernel refuses a blanket confirmation. |
+| **D28** | **A gap with a draft on offer is asked as a confirmation, and a draft the requester has not seen counts as progress under D10.** Otherwise the interview argues with its own suggestion: it shows a drafted value and in the same breath complains the question went unanswered, then declares a blocking decision over a slot it has already filled. The same draft a second time is *not* progress — an ignored suggestion must not keep an interview alive forever. |
+| **D29** | **The interviewer's prose is carried only when the ledger backs it.** A model summary is dropped unless the turn recorded an answer or kept a draft, and a confirmation names the slots it wrote. A requester cannot distinguish a fluent summary from a result, so an unbacked summary is a claim of progress the document does not support (D22). |
 
 ## Known gaps, and what happens to each
 
@@ -386,6 +388,29 @@ was correctly forbidden from inventing them. The conversation could not end.
 **Done when**: a requester describes intent in prose, sees what the machine
 drafted and why, corrects what is wrong, confirms the rest, and reaches the
 deterministic sealed state without ever being asked to invent a slot value.
+
+---
+
+### S12 · A drafted gap is confirmed, not re-asked — **DONE**
+
+`branch: s12-confirm-drafted-gaps`
+
+S11 taught the machine to draft, but the interview never learned that a draft
+had arrived. Against a live 2b model the first turn produced a usable draft of
+`intent` and answered in the same breath: *"That did not answer the question I
+asked."* Two such turns and a slot the machine had already filled became a
+blocking decision. The requester was refused by a document that was holding the
+answer.
+
+- A draft the requester has not seen is new information for its gap; the same
+  draft again is not, so D10 still ends an interview going nowhere (D28).
+- A gap with a draft on offer is asked as a confirmation, not re-asked bare.
+- A model summary is carried only when the turn recorded an answer or kept a
+  draft, and a confirmation names the slots it wrote (D29).
+
+**Done when**: a requester who describes work in prose is shown what the machine
+drafted and asked to confirm it, and no slot the machine has drafted is ever
+escalated to a blocking decision on the turn it was drafted.
 
 ---
 
