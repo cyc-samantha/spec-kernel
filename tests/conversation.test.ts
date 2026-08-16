@@ -257,6 +257,66 @@ describe('conversational specification intake', () => {
     ]);
   });
 
+  it('keeps data-mapping scope supplied out of order without stalling on intent', async () => {
+    const model = responses(
+      {
+        answers: [],
+        proposals: [
+          {
+            ruleId: 'intent-declared',
+            slot: 'intent',
+            value: { kind: 'change' },
+            reason: 'the requester said they want to build a tool',
+          },
+          {
+            ruleId: 'title-stated',
+            slot: 'title',
+            value: 'Data mapping tool',
+            reason: 'the requester named the tool they want to build',
+          },
+        ],
+      },
+      {
+        answers: [],
+        proposals: [{
+          ruleId: 'scope-bounded',
+          slot: 'scope',
+          value: {
+            include: [
+              'first name -> surname',
+              'last name -> forename',
+              'full name -> Name',
+              'date of birth -> DOB',
+            ],
+            exclude: [],
+          },
+          reason: 'the requester supplied four literal column mappings but named no exclusions',
+        }],
+      },
+    );
+
+    const first = await converse(
+      state({}),
+      project(),
+      'local-user',
+      "i want to build a data mapping tool that can map data column A to target system target data column z. so like map 'first name' in data A to 'surname' in data B. this is a data flow system i want to build",
+      model,
+    );
+    const second = await converse(
+      first.state,
+      project(),
+      'local-user',
+      'scope include\ndata A ---- target data B column\nfirst name -- surname\nlast name -- forename\nfull name -- Name\ndate of birth -- DOB',
+      model,
+    );
+
+    expect(second.status).toBe('ask');
+    expect(second.state.attempts.map((attempt) => attempt.yieldedNewInformation)).toEqual([true, true]);
+    expect(second.state.proposals.map((proposal) => proposal.slot)).toEqual(['intent', 'title', 'scope']);
+    expect(second.state.messages.at(-1)?.content).toContain('Drafts awaiting your confirmation: scope.');
+    expect(second.state.messages.at(-1)?.content).not.toContain('That did not answer');
+  });
+
   /*
    * A rebuke for a gap the machine just answered for itself is the interview
    * arguing with its own draft. The requester sees a value on offer and a

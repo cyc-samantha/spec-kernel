@@ -260,23 +260,34 @@ function mergeUsableProposals(
  * exists for them to accept. Re-offering the same draft does not, or an ignored
  * suggestion would keep an interview alive that is going nowhere (D10).
  */
-function movedForward(state: ConversationState, asked: MissingItem, draftedBefore: ReadonlySet<string>): boolean {
+function movedForward(
+  state: ConversationState,
+  asked: MissingItem,
+  proposalsBefore: readonly SlotProposal[],
+  answerCountBefore: number,
+): boolean {
+  // One inference may extract several offered gaps. Information supplied out
+  // of Rule order still advances the specification and must not count as a
+  // stalled answer to whichever gap happened to be displayed.
+  if (state.answers.length > answerCountBefore) return true;
   const key = gapKey(asked);
   if (!sealCheck(state.draft).some((item) => gapKey(item) === key)) return true;
-  return state.proposals.some((proposal) => gapKey(proposal) === key) && !draftedBefore.has(key);
+  const prior = new Map(proposalsBefore.map((proposal) => [gapKey(proposal), proposal]));
+  return state.proposals.some((proposal) => !sameProposal(prior.get(gapKey(proposal)), proposal));
 }
 
 function withAttempt(
   state: ConversationState,
   asked: MissingItem,
   prompt: string,
-  draftedBefore: ReadonlySet<string>,
+  proposalsBefore: readonly SlotProposal[],
+  answerCountBefore: number,
 ): ConversationState {
   const attempt = {
     ruleId: asked.ruleId,
     slot: asked.slot,
     wording: prompt,
-    yieldedNewInformation: movedForward(state, asked, draftedBefore),
+    yieldedNewInformation: movedForward(state, asked, proposalsBefore, answerCountBefore),
   };
   return { ...state, attempts: [...state.attempts, attempt] };
 }
@@ -351,7 +362,7 @@ export async function converse(
 ): Promise<ConversationResult> {
   const parsedMessage = conversationMessageSchema.safeParse({ role: 'user', content: userMessage });
   if (!parsedMessage.success) return { status: 'refused', state, reason: 'a conversation turn needs a non-blank user message' };
-  const draftedBefore = new Set(state.proposals.map(gapKey));
+  const proposalsBefore = state.proposals;
   let current = withDerivations({ ...state, messages: [...state.messages, parsedMessage.data] }, project);
   const initialStep = nextStep(current, project, identity);
   const initialTerminal = terminalResult(initialStep, current, '');
@@ -385,7 +396,7 @@ export async function converse(
     ...current,
     proposals: mergeUsableProposals(current, state.proposals, loaded.proposal.proposals),
   };
-  current = withAttempt(current, initialStep.missing, initialStep.prompt, draftedBefore);
+  current = withAttempt(current, initialStep.missing, initialStep.prompt, proposalsBefore, beforeAnswerCount);
   const narration = progressMessage(beforeAnswerCount, state.proposals, current);
 
   const step = nextStep(current, project, identity);
