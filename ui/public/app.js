@@ -9,6 +9,9 @@ const progressSummary = document.querySelector('#progress-summary');
 const missingList = document.querySelector('#missing-list');
 const draftOutput = document.querySelector('#draft-output');
 const errorCard = document.querySelector('#error-card');
+const proposalCard = document.querySelector('#proposal-card');
+const proposalList = document.querySelector('#proposal-list');
+const confirmButton = document.querySelector('#confirm-proposals');
 const downloadButton = document.querySelector('#download-spec');
 
 let sessionId;
@@ -18,7 +21,38 @@ let terminal = false;
 function setBusy(busy) {
   intentInput.disabled = busy || terminal;
   sendButton.disabled = busy || terminal;
+  confirmButton.disabled = busy || terminal;
   sendButton.textContent = busy ? 'Thinking…' : 'Send';
+}
+
+function proposalRow(proposal) {
+  const row = document.createElement('li');
+  row.className = proposal.consequence === 'authority' ? 'proposal authority' : 'proposal';
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.value = proposal.slot;
+  // WHY: a grant of authority nobody read is a grant the machine made itself.
+  box.checked = proposal.consequence !== 'authority';
+  const label = document.createElement('div');
+  const slot = document.createElement('strong');
+  slot.textContent = proposal.slot;
+  const value = document.createElement('code');
+  value.textContent = JSON.stringify(proposal.value);
+  const reason = document.createElement('p');
+  reason.className = 'proposal-reason';
+  reason.textContent = proposal.reason;
+  label.append(slot, value, reason);
+  row.append(box, label);
+  return row;
+}
+
+function renderProposals(proposals = []) {
+  proposalCard.hidden = proposals.length === 0;
+  proposalList.replaceChildren(...proposals.map(proposalRow));
+}
+
+function checkedSlots() {
+  return [...proposalList.querySelectorAll('input:checked')].map((box) => box.value);
 }
 
 function showError(message) {
@@ -81,6 +115,7 @@ function render(result) {
     ? result.missing
     : result.missing ? [result.missing] : [];
   renderMissing(missing);
+  renderProposals(terminal ? [] : currentState.proposals);
   statusBadge.className = `status ${result.status}`;
   statusBadge.textContent = result.status.replaceAll('_', ' ');
   if (result.status === 'sealed') {
@@ -143,6 +178,21 @@ async function sendMessage() {
   }
 }
 
+async function confirmSelected() {
+  const slots = checkedSlots();
+  if (!slots.length || !sessionId) return;
+  setBusy(true);
+  clearError();
+  try {
+    render(await post('/api/conversation/confirm', { sessionId, slots }));
+  } catch (error) {
+    showError(`The confirmation could not be recorded: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+confirmButton.addEventListener('click', confirmSelected);
 composer.addEventListener('submit', (event) => {
   event.preventDefault();
   sendMessage();

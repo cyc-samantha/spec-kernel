@@ -49,6 +49,18 @@
 
         <div id="conversation" class="conversation" aria-live="polite"></div>
 
+        <section id="proposal-card" class="proposal-card" aria-labelledby="proposal-title" hidden>
+          <div class="proposal-heading">
+            <div>
+              <p class="eyebrow">DRAFTED FOR YOUR REVIEW</p>
+              <h3 id="proposal-title">I filled these in. Correct anything that is wrong.</h3>
+            </div>
+            <button id="confirm-proposals" class="button primary" type="button">Confirm selected</button>
+          </div>
+          <ul id="proposal-list" class="proposal-list"></ul>
+          <p class="proposal-note">Values that decide what an Agent may do unsupervised start unticked. Nobody can grant that on your behalf.</p>
+        </section>
+
         <form id="composer" class="composer">
           <label class="sr-only" for="intent-input">Your answer</label>
           <textarea id="intent-input" rows="3" maxlength="20000" placeholder="For example: I need customers to export their invoices as CSV…" required></textarea>
