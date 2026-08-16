@@ -12,7 +12,9 @@ disagree, this file wins.
 ## What this is
 
 The specification layer. A human intent goes in; a contract an agent team can
-claim comes out. It executes nothing, holds no credentials, and calls no service.
+claim comes out. The kernel executes nothing, holds no credentials, and calls no
+service. The optional application shell may call a configured model runtime
+through `ports/model.ts`; no model provider or transport belongs in `kernel/`.
 
 **It is a kernel.** It contains the universal minimum and nothing else. A
 domain's vocabulary belongs in a profile, a task type's falsifiability
