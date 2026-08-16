@@ -203,7 +203,7 @@ its rule biting.
 
 ---
 
-### S3 · The project port, entitlement, and two real projects
+### S3 · The project port, entitlement, and two real projects — **DONE**
 
 `branch: s3-project-port`
 

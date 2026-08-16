@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "target_repository": "cyc-samantha/cfd-advisor",
+  "boundary_source": "AGENTS.md",
+  "slot_entitlements": {
+    "requester": ["product-owner"],
+    "technical_author": ["repository-maintainer"]
+  },
+  "signing_identity": "repository-maintainer"
+}
