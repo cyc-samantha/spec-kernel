@@ -5,9 +5,10 @@ import { readFile } from 'node:fs/promises';
 import { OllamaAdapter } from '../adapters/ollama.ts';
 import { assessDraft } from '../kernel/draft.ts';
 import { advanceInterview, type InterviewAttempt } from '../kernel/interview.ts';
-import type { ModelPort } from '../ports/model.ts';
+import type { ModelPort, SplitPort } from '../ports/model.ts';
 import { loadProjectDeclaration, type ProjectDeclaration } from '../ports/project.ts';
 import { confirmProposals, converse, type ConversationState } from './conversation.ts';
+import { proposeSplit } from './split-review.ts';
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const PUBLIC = new URL('./public/', import.meta.url);
@@ -92,7 +93,7 @@ interface Session {
 }
 
 export interface UiServerOptions {
-  model?: ModelPort;
+  model?: ModelPort & Partial<SplitPort>;
   modelLabel?: string;
   project?: ProjectDeclaration;
   identity?: string;
@@ -123,7 +124,7 @@ function positiveIntegerSetting(name: string): number | undefined {
   return value;
 }
 
-function configuredModel(): { model: ModelPort; label: string } {
+function configuredModel(): { model: ModelPort & Partial<SplitPort>; label: string } {
   const adapter = process.env['SPEC_MODEL_ADAPTER']?.trim() || 'ollama';
   if (adapter !== 'ollama') throw new Error(`unsupported model adapter: ${adapter}`);
   const name = process.env['SPEC_MODEL_NAME']?.trim() || 'qwen3.5:4b';
@@ -262,6 +263,26 @@ function conversationRoutes(options: UiServerOptions): (
       const result = confirmProposals(session.state, project, identity, slots);
       session.state = result.state;
       json(response, 200, { ...result, runtime: configured.label });
+      return true;
+    }
+
+    if (request.method === 'POST' && pathname === '/api/conversation/split') {
+      const body = record(await parsedBody(request, response));
+      const session = typeof body?.['sessionId'] === 'string' ? sessions.get(body['sessionId']) : undefined;
+      if (!session) {
+        if (!response.headersSent) json(response, 404, { error: 'session_not_found' });
+        return true;
+      }
+      // SAFETY: a deployment whose adapter cannot split must not receive a
+      // division from anywhere else.
+      if (!configured.model.splitIntent) {
+        json(response, 422, { error: 'split_unsupported' });
+        return true;
+      }
+      const review = await proposeSplit(session.state.draft, identity, {
+        splitIntent: configured.model.splitIntent.bind(configured.model),
+      });
+      json(response, 200, { ...review, runtime: configured.label });
       return true;
     }
     return false;
