@@ -13,10 +13,16 @@ const proposalCard = document.querySelector('#proposal-card');
 const proposalList = document.querySelector('#proposal-list');
 const confirmButton = document.querySelector('#confirm-proposals');
 const downloadButton = document.querySelector('#download-spec');
+const ticketCard = document.querySelector('#ticket-card');
+const ticketList = document.querySelector('#ticket-list');
+const ticketSummary = document.querySelector('#ticket-summary');
+const splitButton = document.querySelector('#split-spec');
+const downloadTickets = document.querySelector('#download-tickets');
 
 let sessionId;
 let currentState;
 let terminal = false;
+let tickets = [];
 
 function setBusy(busy) {
   intentInput.disabled = busy || terminal;
@@ -109,6 +115,7 @@ function render(result) {
   runtimeLabel.textContent = result.runtime;
   runtimeLight.className = '';
   downloadButton.hidden = result.status !== 'sealed';
+  ticketCard.hidden = result.status !== 'sealed';
   terminal = ['sealed', 'awaiting_handoff', 'blocking_decision'].includes(result.status);
 
   const missing = Array.isArray(result.missing)
@@ -192,6 +199,55 @@ async function confirmSelected() {
   }
 }
 
+function ticketRow(contract) {
+  const row = document.createElement('li');
+  row.className = 'proposal';
+  const label = document.createElement('div');
+  const title = document.createElement('strong');
+  title.textContent = `${contract.id} · ${contract.title}`;
+  const criteria = document.createElement('code');
+  criteria.textContent = contract.criteria.join(', ');
+  const order = document.createElement('p');
+  order.className = 'proposal-reason';
+  order.textContent = contract.after.length
+    ? `follows ${contract.after.join(', ')}`
+    : 'no prior contract';
+  label.append(title, criteria, order);
+  row.append(label);
+  return row;
+}
+
+function renderSplit(review) {
+  tickets = review.status === 'split' ? review.contracts : [];
+  ticketList.replaceChildren(...tickets.map(ticketRow));
+  downloadTickets.hidden = tickets.length === 0;
+  if (review.status === 'split') ticketSummary.textContent = review.because;
+  else if (review.status === 'whole') ticketSummary.textContent = `One contract: ${review.because}`;
+  else ticketSummary.textContent = review.reason;
+}
+
+async function splitSealed() {
+  if (!sessionId) return;
+  splitButton.disabled = true;
+  clearError();
+  try {
+    renderSplit(await post('/api/conversation/split', { sessionId }));
+  } catch (error) {
+    showError(`The specification could not be divided: ${error.message}`);
+  } finally {
+    splitButton.disabled = false;
+  }
+}
+
+splitButton.addEventListener('click', splitSealed);
+downloadTickets.addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(tickets, null, 2)], { type: 'application/json' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'tickets.json';
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
 confirmButton.addEventListener('click', confirmSelected);
 composer.addEventListener('submit', (event) => {
   event.preventDefault();
