@@ -334,6 +334,15 @@ function promptFor(
 }
 
 /*
+ * Saying a turn failed is only useful beside a way out of it. Both routes named
+ * here are ones the requester can take by typing, because that is now the only
+ * thing they have.
+ */
+function untranslated(slot: string): string {
+  return `I could not turn that into ${slot}. The draft above is still my earlier guess — say "confirm ${slot}" to take it as it stands, or say the value again in one line.`;
+}
+
+/*
  * A grant of authority nobody read is a grant the machine made itself (D14).
  * Agreement is enough for a routine draft; this one has to be said by name.
  */
@@ -479,9 +488,7 @@ export async function converse(
     correctionIsNew,
   );
   const progress = progressMessage(beforeAnswerCount, state.proposals, current);
-  const narration = progress || (correctionIsNew
-    ? `I could not apply the ${focus.slot} correction automatically. Edit that drafted JSON value above, then confirm it.`
-    : '');
+  const narration = progress || (correctionIsNew ? untranslated(focus.slot) : '');
 
   const step = nextStep(current, project, identity);
   const terminal = terminalResult(step, current, narration);

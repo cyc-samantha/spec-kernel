@@ -658,7 +658,7 @@ describe('conversational specification intake', () => {
     expect(corrected.state.attempts.at(-1)?.yieldedNewInformation).toBe(true);
   });
 
-  it('routes an unparsed pending correction to the editable draft without stalling', async () => {
+  it('offers a spoken way out of a correction it could not translate', async () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['title'];
     delete draft['scope'];
@@ -685,8 +685,9 @@ describe('conversational specification intake', () => {
 
     expect(result.state.attempts.at(-1)?.yieldedNewInformation).toBe(true);
     expect(result.state.messages.at(-1)?.content).toContain(
-      'I could not apply the scope correction automatically. Edit that drafted JSON value above, then confirm it.',
+      'I could not turn that into scope.',
     );
+    expect(result.state.messages.at(-1)?.content).toContain('say "confirm scope"');
     expect(result.state.messages.at(-1)?.content).not.toContain('That did not answer');
   });
 

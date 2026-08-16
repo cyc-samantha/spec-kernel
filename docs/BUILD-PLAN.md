@@ -87,7 +87,8 @@ L2 and L3 exist and work. This repository is the missing front half.
 | **D29** | **The interviewer's prose is carried only when the ledger backs it.** A model summary is dropped unless the turn recorded an answer or kept a draft, and a confirmation names the slots it wrote. A requester cannot distinguish a fluent summary from a result, so an unbacked summary is a claim of progress the document does not support (D22). |
 | **D30** | **A model adapter declares its context window and refuses a reply that overran it.** A local runtime whose window cannot hold the prompt does not fail — it discards the oldest tokens, which are the instructions, and answers HTTP 200 anyway. The reply is fluent and grounded in nothing. Inheriting the runtime's default window is therefore a fail-open on the one input the kernel cannot re-derive: what the requester actually said. |
 | **D31** | **The parent intent a split traces to is derived from the sealed document, never re-elicited, and splitting is a capability a deployment may not have.** Re-asking for the parent would restart the authorship chain at whoever happens to be dividing the work (D22). `SplitPort` is separate from `ModelPort` so a deployment that only elicits one bounded change need not implement it — and one that cannot split refuses the route rather than sourcing a division from somewhere else. |
-| **D32** | **A pending model draft survives turns and can be approved only through the named human confirmation route.** The next model turn receives pending drafts but cannot copy one into `answers`; a correction returned through the wrong model channel remains a proposal. Explicit corrections focus only their named pending gap. When a small model still cannot translate one, the requester edits the drafted JSON and the same Rule validates it before confirmation. Model prose never narrates progress; the answer ledger does. |
+| **D32** | **A pending model draft survives turns and can be approved only through the named human confirmation route.** The next model turn receives pending drafts but cannot copy one into `answers`; explicit corrections focus only their named pending gap. Model prose never narrates progress; the answer ledger does. *Amended by D33: the route is a spoken one, and a differing value is a human answer rather than a redirected proposal.* |
+| **D33** | **A specification has one entrance: what a person says in the interview.** Accepting a draft is read out of the message, deterministically, before the model is consulted — a translator that could recognise its own approval would be approving its own work (D8), so agreement never reaches it. Recognition stays narrow: a message carrying content falls through to an ordinary turn, where a value the human stated outranks any draft standing in that slot, because discarding it leaves the machine's guess in its place. A draft whose consequence is `authority` is unreachable by a general agreement and must be named (D14). No second route writes to the document — a tick box beside a conversation that keeps asking the same question teaches a requester that answering does nothing. |
 
 ## Known gaps, and what happens to each
 
@@ -498,6 +499,34 @@ requester unable to finish one intake.
 inside the local budget, retains its scope draft across turns, never attributes
 an inferred value to the requester, and gives the requester a deterministic
 way to correct all four mappings when the configured 2b model cannot.
+
+---
+
+### S16 · Confirmation is something the requester says — **DONE**
+
+`branch: s16-confirmation-is-spoken`
+
+User testing stalled on a turn that named four column mappings. Replaying it
+against `qwen3.5:2b` showed the model had translated it correctly and the
+application had thrown the answer away, because `scope` already held a machine
+draft; what survived was the model's own reconciliation of the two, which had
+moved three of the four stated mappings into `exclude`. The requester was then
+told to edit JSON in a side panel while the conversation went on asking an
+unrelated question.
+
+- A value the human stated outranks a draft standing in the same slot. The
+  guard that dropped it was aimed at a model approving its own draft and caught
+  a human overriding one as well; the distinction is now the value itself
+  (D33).
+- Agreement is read out of the typed message by `ui/confirmation.ts`, before
+  any inference. Recognition is narrow and fail-closed: content falls through
+  to an ordinary turn. An `authority` draft needs its own name (D14).
+- The drafts card reports what was guessed and why. The tick box, the JSON
+  editor, and `POST /api/conversation/confirm` are gone, leaving one entrance.
+
+**Done when**: the live four-mapping turn records all four in `scope` as the
+requester's own answer, and a requester who only ever types can move every
+routine draft into the document.
 
 ---
 
