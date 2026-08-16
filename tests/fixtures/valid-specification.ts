@@ -3,6 +3,7 @@ import type { Specification } from '../../kernel/specification.ts';
 /** A complete document that every mutation-based seal-check test starts from. */
 export function validSpecification(): Specification {
   return {
+    intent: { kind: 'change' },
     id: 'WC-0001',
     title: 'Reject an unsupported export field',
     target: 'example-repository',
