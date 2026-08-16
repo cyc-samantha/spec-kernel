@@ -247,7 +247,7 @@ branch on: no kernel source may condition on which door was used.
 
 ---
 
-### S5 · The non-technical door — elicit-first
+### S5 · The non-technical door — elicit-first — **DONE**
 
 `branch: s5-grill`
 
