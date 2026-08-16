@@ -405,6 +405,10 @@ export async function converse(
   const offered = new Map(eligibleMissing(current.draft, project, identity).map((item) => [gapKey(item), item]));
   const beforeAnswerCount = current.answers.length;
   const focus = modelFocus(userMessage, current.proposals, offered, initialStep.missing);
+  const isFocusedCorrection = gapKey(focus) !== gapKey(initialStep.missing);
+  const presented = isFocusedCorrection
+    ? new Map([[gapKey(focus), focus]])
+    : offered;
 
   let raw: unknown;
   try {
@@ -412,7 +416,7 @@ export async function converse(
       messages: current.messages,
       draft: current.draft,
       focus,
-      missing: [...offered.values()],
+      missing: [...presented.values()],
       proposals: current.proposals,
     });
   } catch (error) {
@@ -420,8 +424,11 @@ export async function converse(
   }
   const loaded = loadModelProposal(raw);
   if (!loaded.ok) return { status: 'refused', state: current, reason: loaded.reason };
-  if (loaded.proposal.answers.some((answer) => !offered.has(gapKey(answer)))) {
+  if (loaded.proposal.answers.some((answer) => !presented.has(gapKey(answer)))) {
     return { status: 'refused', state: current, reason: 'the model proposed an answer outside the offered Rule gaps' };
+  }
+  if (loaded.proposal.proposals.some((proposal) => !presented.has(gapKey(proposal)))) {
+    return { status: 'refused', state: current, reason: 'the model proposed a draft outside the offered Rule gaps' };
   }
 
   // A standing machine draft can become an answer only through the named,
@@ -430,7 +437,7 @@ export async function converse(
   const pending = new Map(current.proposals.map((proposal) => [gapKey(proposal), proposal]));
   const directAnswers = loaded.proposal.answers.filter((answer) => !pending.has(gapKey(answer)));
   const redirected = redirectedPendingAnswers(pending, loaded.proposal.answers);
-  const applied = applyModelAnswers(current, offered, directAnswers, identity, project);
+  const applied = applyModelAnswers(current, presented, directAnswers, identity, project);
   current = withDerivations(applied, project);
   current = {
     ...current,

@@ -295,9 +295,11 @@ describe('conversational specification intake', () => {
       },
     ];
     const focuses: string[] = [];
+    const presented: string[][] = [];
     const model: ModelPort = {
       complete: async (request) => {
         focuses.push(request.focus.slot);
+        presented.push(request.missing.map((gap) => gap.slot));
         return outputs.shift();
       },
     };
@@ -320,6 +322,7 @@ describe('conversational specification intake', () => {
     expect(second.status).toBe('ask');
     expect(second.state.attempts.map((attempt) => attempt.yieldedNewInformation)).toEqual([true, true]);
     expect(focuses).toEqual(['intent', 'scope']);
+    expect(presented[1]).toEqual(['scope']);
     expect(second.state.proposals.map((proposal) => proposal.slot)).toEqual(['intent', 'scope']);
     expect(second.state.messages.at(-1)?.content).toContain('Drafts awaiting your confirmation: scope.');
     expect(second.state.messages.at(-1)?.content).not.toContain('That did not answer');
