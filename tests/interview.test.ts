@@ -36,6 +36,29 @@ describe('the elicit-first path', () => {
     });
   });
 
+  /*
+   * A live requester answered "what can answer in irreversibility" and was
+   * asked the same question again. The three values it admits are in the rule's
+   * own schema; a person who cannot see them is being asked to guess.
+   */
+  it('lists the values a gap admits when its schema names them', () => {
+    const draft = golden();
+    delete draft['irreversibility'];
+    const step = advanceInterview(draft, project());
+
+    expect(step).toMatchObject({ status: 'ask' });
+    expect((step as { prompt: string }).prompt).toContain('one of: refactor, migration, rewrite');
+  });
+
+  /** A gap whose schema names nothing is asked as its rule wrote it. */
+  it('adds no choices to a gap that admits any value', () => {
+    const draft = golden();
+    delete draft['constraints'];
+    const step = advanceInterview(draft, project()) as { prompt: string; missing: { question: string } };
+
+    expect(step.prompt).toBe(step.missing.question);
+  });
+
   it('asks the question carried by the missing rule', () => {
     const draft = golden();
     delete draft['blockingDecisions'];

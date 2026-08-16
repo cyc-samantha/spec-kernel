@@ -1,6 +1,6 @@
 import { recordAnswer, recordDerivation, type SlotAnswer } from '../kernel/answers.ts';
 import { deriveSlot, hasDerivation } from '../kernel/derivations.ts';
-import { advanceInterview, type InterviewAttempt } from '../kernel/interview.ts';
+import { advanceInterview, questionFor, type InterviewAttempt } from '../kernel/interview.ts';
 import { sealCheck, type MissingItem } from '../kernel/seal-check.ts';
 import type { Consequence, Entitlement, RuleId } from '../kernel/rules.ts';
 import type { ProjectDeclaration } from '../ports/project.ts';
@@ -345,7 +345,7 @@ function promptFor(
 ): string {
   const drafted = state.proposals.some((proposal) => gapKey(proposal) === gapKey(step.missing));
   if (!drafted) return step.prompt;
-  return `I drafted an answer for this. Confirm it above, or correct me here. ${step.missing.question}`;
+  return `I drafted an answer for this. Confirm it above, or correct me here. ${questionFor(step.missing)}`;
 }
 
 /*
@@ -376,7 +376,7 @@ function askResult(
   progressMessage: string,
   explained = false,
 ): ConversationResult {
-  const prompt = explained ? step.missing.question : promptFor(state, step);
+  const prompt = explained ? questionFor(step.missing) : promptFor(state, step);
   return {
     status: 'ask',
     state: withAssistant(state, [progressMessage, prompt].filter(Boolean).join('\n\n')),

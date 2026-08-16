@@ -36,6 +36,19 @@ function consecutiveStalls(attempts: readonly InterviewAttempt[], missing: Missi
   return count;
 }
 
+/*
+ * A closed set of values is part of the question, not advice about it: a person
+ * asked to guess which words a slot admits is being asked to fail. Read off the
+ * schema rather than written beside it, so one cannot drift from the other (D6).
+ */
+export function questionFor(missing: MissingItem): string {
+  const schema = missing.valueSchema;
+  if (typeof schema !== 'object' || schema === null) return missing.question;
+  const admitted = (schema as { enum?: unknown }).enum;
+  if (!Array.isArray(admitted) || admitted.length === 0) return missing.question;
+  return `${missing.question} Answer with one of: ${admitted.join(', ')}.`;
+}
+
 function decisionId(missing: MissingItem): string {
   const suffix = `${missing.ruleId}-${missing.slot}`
     .toLowerCase()
@@ -84,5 +97,5 @@ export function advanceInterview(
   // requester declined or the translation failed is not visible from here, and
   // a prefix that blames them is wrong exactly when the translation was.
   const prefix = stalls === 1 ? 'I still do not have a value for this. ' : '';
-  return { status: 'ask', missing: next, prompt: `${prefix}${next.question}` };
+  return { status: 'ask', missing: next, prompt: `${prefix}${questionFor(next)}` };
 }
