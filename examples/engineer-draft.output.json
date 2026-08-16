@@ -1,4 +1,5 @@
 {
+  "intent": { "kind": "change" },
   "id": "WC-EXAMPLE-01",
   "title": "Reject an unsupported export field",
   "target": "example/repository",

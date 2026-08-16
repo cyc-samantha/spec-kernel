@@ -8,6 +8,7 @@ export const ruleIds = [
   'proposals-resolved',
   'human-criteria-covered',
   'evidence-producible',
+  'spike-knowledge-output',
 ] as const;
 
 export type RuleId = (typeof ruleIds)[number];
@@ -64,6 +65,7 @@ const requiredDecisionSchema = z.discriminatedUnion('deferred', [
  * questions and the question set would no longer be derived one-to-one.
  */
 const requiredSlotsSchema = z.object({
+  intent: z.object({ kind: z.enum(['change', 'spike']) }),
   id: nonBlank,
   title: nonBlank,
   target: nonBlank,
@@ -241,6 +243,25 @@ const evidenceProducible: Rule = {
   },
 };
 
+const spikeKnowledgeOutput: Rule = {
+  id: 'spike-knowledge-output',
+  slot: 'acceptance.*.verification',
+  question: 'What knowledge will this spike produce, and how will a person review it?',
+  entitlement: 'requester',
+  check(specification) {
+    const intent = asRecord(asRecord(specification)?.['intent']);
+    if (intent?.['kind'] !== 'spike') return [];
+    return criteriaOf(specification).flatMap((criterion, index) => {
+      const mechanism = criterion['verification'];
+      if (mechanism === 'human_review' || mechanism === 'rubric') return [];
+      return [{
+        slot: criterionSlot(criterion, index, '.verification'),
+        message: 'a spike criterion must produce reviewable knowledge rather than claim a change',
+      }];
+    });
+  },
+};
+
 export const rules: readonly Rule[] = [
   requiredSlots,
   executableTestTarget,
@@ -249,4 +270,5 @@ export const rules: readonly Rule[] = [
   proposalsResolved,
   humanCriteriaCovered,
   evidenceProducible,
+  spikeKnowledgeOutput,
 ];

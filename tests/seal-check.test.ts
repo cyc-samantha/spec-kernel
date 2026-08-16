@@ -67,6 +67,12 @@ describe('the seven v1 rules', () => {
         specification.acceptance[1]!.verification = 'deterministic_assertion';
       },
     },
+    {
+      ruleId: 'spike-knowledge-output',
+      mutate: (specification) => {
+        specification.intent.kind = 'spike';
+      },
+    },
   ];
 
   it.each(scenarios)('reports only $ruleId when that rule is broken', ({ ruleId, mutate }) => {
@@ -76,7 +82,7 @@ describe('the seven v1 rules', () => {
   });
 
   it('keeps each check, question, and entitlement in one rule object', () => {
-    expect(rules).toHaveLength(7);
+    expect(rules).toHaveLength(8);
     for (const rule of rules) {
       expect(rule.question.trim()).not.toBe('');
       expect(rule.entitlement).toMatch(/^(requester|technical_author)$/);
@@ -87,6 +93,7 @@ describe('the seven v1 rules', () => {
 
 describe('required slots', () => {
   const topLevelSlots = [
+    'intent',
     'id',
     'title',
     'target',
@@ -114,6 +121,24 @@ describe('required slots', () => {
         expect.objectContaining({ ruleId: 'required-slots', slot: 'context.0.why' }),
       ]),
     );
+  });
+});
+
+describe('spike specifications', () => {
+  it('admits criteria whose output is reviewable knowledge', () => {
+    const specification = validSpecification();
+    specification.intent.kind = 'spike';
+    specification.acceptance[0]!.text = 'We know which export formats preserve the required data';
+    specification.acceptance[1]!.text = 'The findings compare every candidate format';
+    specification.acceptance[1]!.verification = 'rubric';
+    delete specification.acceptance[1]!.targetTest;
+    expect(sealCheck(specification)).toEqual([]);
+  });
+
+  it('refuses a spike that claims an executable change as its output', () => {
+    const specification = validSpecification();
+    specification.intent.kind = 'spike';
+    expect(ruleIdsFor(specification)).toEqual(['spike-knowledge-output']);
   });
 });
 

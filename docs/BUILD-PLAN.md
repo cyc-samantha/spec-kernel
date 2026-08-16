@@ -266,7 +266,7 @@ shape* — the practical test of D13.
 
 ---
 
-### S6 · The spike outlet
+### S6 · The spike outlet — **DONE**
 
 `branch: s6-spike`
 

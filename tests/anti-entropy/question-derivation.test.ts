@@ -66,6 +66,13 @@ const fixtures: readonly QuestionFixture[] = [
       return specification;
     },
   },
+  {
+    ruleId: 'spike-knowledge-output',
+    removeAnswer(specification) {
+      specification.intent.kind = 'spike';
+      return specification;
+    },
+  },
 ];
 
 describe('question derivation', () => {

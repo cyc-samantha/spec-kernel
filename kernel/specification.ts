@@ -54,6 +54,7 @@ export const blockingDecisionSchema = z.discriminatedUnion('deferred', [
 
 /** The document handed to the execution boundary once every rule admits it. */
 export const specificationSchema = z.object({
+  intent: z.object({ kind: z.enum(['change', 'spike']) }),
   id: nonBlank,
   title: nonBlank,
   target: nonBlank,
