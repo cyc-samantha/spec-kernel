@@ -2,41 +2,51 @@ import { ModelPortError, type ModelPort, type ModelRequest } from '../ports/mode
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:11434';
 const DEFAULT_TIMEOUT_MS = 300_000;
-const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
+const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 const DEFAULT_KEEP_ALIVE = '10m';
 const MAX_RESPONSE_BYTES = 1024 * 1024;
+
+const valueEntry = {
+  type: 'object',
+  properties: {
+    ruleId: { type: 'string', minLength: 1 },
+    slot: { type: 'string', minLength: 1 },
+    value: {},
+  },
+  required: ['ruleId', 'slot', 'value'],
+  additionalProperties: false,
+} as const;
 
 const proposalFormat = {
   type: 'object',
   properties: {
     assistantMessage: { type: 'string', minLength: 1 },
-    answers: {
+    answers: { type: 'array', maxItems: 64, items: valueEntry },
+    proposals: {
       type: 'array',
       maxItems: 64,
       items: {
-        type: 'object',
-        properties: {
-          ruleId: { type: 'string', minLength: 1 },
-          slot: { type: 'string', minLength: 1 },
-          value: {},
-        },
-        required: ['ruleId', 'slot', 'value'],
-        additionalProperties: false,
+        ...valueEntry,
+        properties: { ...valueEntry.properties, reason: { type: 'string', minLength: 1 } },
+        required: ['ruleId', 'slot', 'value', 'reason'],
       },
     },
   },
-  required: ['assistantMessage', 'answers'],
+  required: ['assistantMessage', 'answers', 'proposals'],
   additionalProperties: false,
 } as const;
 
-const systemPrompt = `You translate human answers into one structured specification value.
-Use only facts stated by the human in the conversation. Never invent an answer.
-The supplied gaps and questions originate in deterministic Rules.
-Return an answers entry only for a gap the human actually answered. Copy its ruleId and slot exactly.
-Use the supplied valueSchema to produce the exact JSON type and shape for each slot.
-You may translate or summarize facts the human stated, but do not invent identifiers, paths, tests, decisions, or policy.
-Put the exact JSON value for that supplied slot in value. Omit unanswered gaps from answers.
-assistantMessage briefly explains what was or was not understood; do not ask another question.
+const systemPrompt = `You turn a human conversation into structured values for deterministic Rule gaps.
+Each supplied gap carries its own question and its own valueSchema. Copy its ruleId and slot exactly.
+Produce the exact JSON type and shape that gap's valueSchema requires.
+
+answers: gaps the human actually answered or explicitly confirmed. Use only facts they stated.
+proposals: your own draft for gaps they did not answer, each with a short reason naming what in the
+conversation it rests on. A draft is a suggestion for a person to accept or correct, never an answer.
+Draft every gap you can reasonably infer; leave a gap out of both lists when you have nothing to go on.
+Never move a draft into answers yourself. Never invent identifiers, file paths, or test names.
+
+assistantMessage briefly says what you understood and what you drafted; do not ask another question.
 Never claim that a specification is complete or sealed.`;
 
 export interface OllamaAdapterOptions {
@@ -120,11 +130,7 @@ export class OllamaAdapter implements ModelPort {
             ...request.messages,
             {
               role: 'system',
-              content: JSON.stringify({
-                currentDraft: request.draft,
-                gaps: request.missing,
-                valueSchema: request.valueSchema,
-              }),
+              content: JSON.stringify({ currentDraft: request.draft, gaps: request.missing }),
             },
           ],
         }),

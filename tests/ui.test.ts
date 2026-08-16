@@ -146,7 +146,7 @@ describe('Conversational UI API', () => {
     await expect(response.json()).resolves.toEqual(expect.objectContaining({
       status: 'refused',
       reason: 'the configured model is unavailable',
-      state: expect.objectContaining({ draft: {} }),
+      state: expect.objectContaining({ answers: [expect.objectContaining({ source: 'derived' })] }),
     }));
   });
 });

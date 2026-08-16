@@ -7,10 +7,6 @@ function request(): ModelRequest {
   return {
     messages: [{ role: 'user', content: 'There are no blocking decisions.' }],
     draft: { title: 'Example' },
-    valueSchema: {
-      type: 'object',
-      properties: { blockingDecisions: { type: 'array' } },
-    },
     missing: [{
       ruleId: 'blocking-decisions-declared',
       slot: 'blockingDecisions',
@@ -35,6 +31,7 @@ describe('Ollama model adapter', () => {
             slot: 'blockingDecisions',
             value: [],
           }],
+          proposals: [],
         }),
       },
     }), { status: 200, headers: { 'content-type': 'application/json' } }));
@@ -47,6 +44,7 @@ describe('Ollama model adapter', () => {
         slot: 'blockingDecisions',
         value: [],
       }],
+      proposals: [],
     });
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0]!;
@@ -58,11 +56,11 @@ describe('Ollama model adapter', () => {
       think: false,
       keep_alive: '10m',
       format: expect.objectContaining({ type: 'object' }),
-      options: { temperature: 0, num_predict: 1024 },
+      options: { temperature: 0, num_predict: 4096 },
     }));
     expect(JSON.stringify(body)).toContain('blocking-decisions-declared');
     expect(JSON.stringify(body)).toContain('blockingDecisions');
-    expect(JSON.stringify(body)).toContain('Use the supplied valueSchema');
+    expect(JSON.stringify(body)).toContain('Never move a draft into answers yourself');
     expect(JSON.stringify(body)).toContain('Never claim that a specification is complete or sealed');
   });
 

@@ -6,13 +6,43 @@ describe('model port response boundary', () => {
   it('admits a structured answer without attaching a provider format', () => {
     expect(loadModelProposal({
       assistantMessage: 'I understood the excluded scope.',
-      answers: [{ ruleId: 'required-slots', slot: 'scope.exclude', value: ['generated/**'] }],
+      answers: [{ ruleId: 'scope-bounded', slot: 'scope', value: { include: ['src/**'], exclude: [] } }],
     })).toEqual({
       ok: true,
       proposal: {
         assistantMessage: 'I understood the excluded scope.',
-        answers: [{ ruleId: 'required-slots', slot: 'scope.exclude', value: ['generated/**'] }],
+        answers: [{ ruleId: 'scope-bounded', slot: 'scope', value: { include: ['src/**'], exclude: [] } }],
+        proposals: [],
       },
+    });
+  });
+
+  /*
+   * A draft without grounds cannot be reviewed, only rubber-stamped, so the
+   * boundary refuses it rather than showing a person a bare value to approve.
+   */
+  it('refuses a drafted value that names no reason', () => {
+    expect(loadModelProposal({
+      assistantMessage: 'I drafted the risk.',
+      answers: [],
+      proposals: [{ ruleId: 'risk-classified', slot: 'risk', value: 'medium' }],
+    })).toEqual({
+      ok: false,
+      reason: 'the model response did not match the proposal schema',
+    });
+  });
+
+  it('refuses duplicate drafts for the same Rule-owned slot', () => {
+    expect(loadModelProposal({
+      assistantMessage: 'I drafted the risk twice.',
+      answers: [],
+      proposals: [
+        { ruleId: 'risk-classified', slot: 'risk', value: 'low', reason: 'a display change' },
+        { ruleId: 'risk-classified', slot: 'risk', value: 'high', reason: 'it moves data' },
+      ],
+    })).toEqual({
+      ok: false,
+      reason: 'the model response did not match the proposal schema',
     });
   });
 
@@ -20,8 +50,8 @@ describe('model port response boundary', () => {
     expect(loadModelProposal({
       assistantMessage: 'I understood the answer.',
       answers: [
-        { ruleId: 'required-slots', slot: 'scope.exclude', value: [] },
-        { ruleId: 'required-slots', slot: 'scope.exclude', value: ['generated/**'] },
+        { ruleId: 'scope-bounded', slot: 'scope', value: [] },
+        { ruleId: 'scope-bounded', slot: 'scope', value: ['generated/**'] },
       ],
     })).toEqual({
       ok: false,

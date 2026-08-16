@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ModelPortError, type ModelPort } from '../ports/model.ts';
 import { loadProjectDeclaration, type ProjectDeclaration } from '../ports/project.ts';
-import { converse, type ConversationState } from '../ui/conversation.ts';
+import { sealCheck } from '../kernel/seal-check.ts';
+import { confirmProposals, converse, type ConversationState } from '../ui/conversation.ts';
 import { validSpecification } from './fixtures/valid-specification.ts';
 
 function project(): ProjectDeclaration {
@@ -20,7 +21,7 @@ function project(): ProjectDeclaration {
 }
 
 function state(draft: unknown): ConversationState {
-  return { draft, messages: [], attempts: [], answers: [] };
+  return { draft, messages: [], attempts: [], answers: [], proposals: [] };
 }
 
 function responses(...items: unknown[]): ModelPort {
@@ -78,17 +79,32 @@ describe('conversational specification intake', () => {
     expect(complete).toHaveBeenCalledOnce();
   });
 
-  it('gives the translator the exact slot schema instead of asking it to guess shapes', async () => {
-    let valueSchema: unknown;
+  it('gives each gap its own slot schema instead of asking the translator to guess shapes', async () => {
+    let gaps: readonly { slot: string; valueSchema: unknown }[] = [];
     const model: ModelPort = {
       complete: async (request) => {
-        valueSchema = request.valueSchema;
+        gaps = request.missing;
         return { assistantMessage: 'More detail is needed.', answers: [] };
       },
     };
     await converse(state({}), project(), 'local-user', 'Build a CSV export.', model);
-    expect(JSON.stringify(valueSchema)).toContain('"kind":{"type":"string","enum":["change","spike"]}');
-    expect(JSON.stringify(valueSchema)).toContain('"blockingDecisions":{"type":"array"');
+    const intent = gaps.find((gap) => gap.slot === 'intent');
+    const risk = gaps.find((gap) => gap.slot === 'risk');
+    expect(JSON.stringify(intent?.valueSchema)).toContain('"enum":["change","spike"]');
+    expect(JSON.stringify(risk?.valueSchema)).toContain('"enum":["low","medium","high","critical"]');
+  });
+
+  it('never offers the translator a slot the kernel derives for itself', async () => {
+    let gaps: readonly { slot: string }[] = [];
+    const model: ModelPort = {
+      complete: async (request) => {
+        gaps = request.missing;
+        return { assistantMessage: 'Understood.', answers: [] };
+      },
+    };
+    await converse(state({}), project(), 'local-user', 'Build a CSV export.', model);
+    expect(gaps.map((gap) => gap.slot)).not.toContain('target');
+    expect(gaps.map((gap) => gap.slot)).not.toContain('id');
   });
 
   it('allows the same entitled user to complete a technical gap without changing the rule', async () => {
@@ -160,6 +176,132 @@ describe('conversational specification intake', () => {
     }));
   });
 
+  it('fills a slot the project declaration already answers without asking anyone', async () => {
+    const model: ModelPort = {
+      complete: async () => ({ assistantMessage: 'Understood.', answers: [], proposals: [] }),
+    };
+    const result = await converse(state({}), project(), 'local-user', 'Build a CSV export.', model);
+    expect(result.state.draft).toEqual(expect.objectContaining({ target: 'example/repository' }));
+    expect(result.state.answers).toEqual([
+      expect.objectContaining({ slot: 'target', source: 'derived', answeredBy: 'derivation' }),
+    ]);
+  });
+
+  it('drafts an open gap instead of asking the requester to invent the value', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'Nothing else is blocked as far as I know.',
+      responses({
+        assistantMessage: 'I drafted the open-decision state.',
+        answers: [],
+        proposals: [{
+          ruleId: 'blocking-decisions-declared',
+          slot: 'blockingDecisions',
+          value: [],
+          reason: 'you said nothing else is blocked',
+        }],
+      }),
+    );
+
+    expect(result.status).toBe('ask');
+    expect(result.state.proposals).toEqual([
+      expect.objectContaining({ slot: 'blockingDecisions', reason: 'you said nothing else is blocked' }),
+    ]);
+  });
+
+  /*
+   * D8: a machine may propose but may not answer its own question. A draft that
+   * reached the document would let one seal-check pass content nobody authored.
+   */
+  it('keeps a machine draft out of the document until a person confirms it', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'Nothing else is blocked.',
+      responses({
+        assistantMessage: 'I drafted the open-decision state.',
+        answers: [],
+        proposals: [{
+          ruleId: 'blocking-decisions-declared',
+          slot: 'blockingDecisions',
+          value: [],
+          reason: 'you said nothing else is blocked',
+        }],
+      }),
+    );
+
+    expect(sealCheck(result.state.draft)).toEqual([
+      expect.objectContaining({ ruleId: 'blocking-decisions-declared' }),
+    ]);
+    expect(result.state.answers).toEqual([]);
+  });
+
+  it('records a confirmed draft as the confirming person answer', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const asked = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'Nothing else is blocked.',
+      responses({
+        assistantMessage: 'I drafted the open-decision state.',
+        answers: [],
+        proposals: [{
+          ruleId: 'blocking-decisions-declared',
+          slot: 'blockingDecisions',
+          value: [],
+          reason: 'you said nothing else is blocked',
+        }],
+      }),
+    );
+
+    const confirmed = confirmProposals(asked.state, project(), 'local-user', ['blockingDecisions']);
+    expect(confirmed.status).toBe('sealed');
+    expect(confirmed.state.answers).toEqual([
+      expect.objectContaining({ slot: 'blockingDecisions', answeredBy: 'local-user', source: 'human' }),
+    ]);
+    expect(confirmed.state.proposals).toEqual([]);
+  });
+
+  it('refuses a confirmation that names no drafted slot', () => {
+    const result = confirmProposals(state({}), project(), 'local-user', []);
+    expect(result).toEqual(expect.objectContaining({
+      status: 'refused',
+      reason: 'a confirmation must name at least one drafted slot',
+    }));
+  });
+
+  it('discards a drafted value the rule that reported the gap would still refuse', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'Nothing else is blocked.',
+      responses({
+        assistantMessage: 'I drafted the open-decision state.',
+        answers: [],
+        proposals: [{
+          ruleId: 'blocking-decisions-declared',
+          slot: 'blockingDecisions',
+          value: 'none',
+          reason: 'you said nothing else is blocked',
+        }],
+      }),
+    );
+
+    expect(result.state.proposals).toEqual([]);
+  });
+
   it('refuses malformed model output instead of treating it as an answer', async () => {
     const result = await converse(
       state({}),
@@ -181,7 +323,7 @@ describe('conversational specification intake', () => {
     expect(result).toEqual(expect.objectContaining({
       status: 'refused',
       reason: 'the configured model is unavailable',
-      state: expect.objectContaining({ draft: {} }),
+      state: expect.objectContaining({ answers: [expect.objectContaining({ source: 'derived' })] }),
     }));
   });
 
@@ -194,7 +336,7 @@ describe('conversational specification intake', () => {
     expect(result).toEqual(expect.objectContaining({
       status: 'refused',
       reason: 'the configured model request timed out',
-      state: expect.objectContaining({ draft: {} }),
+      state: expect.objectContaining({ answers: [expect.objectContaining({ source: 'derived' })] }),
     }));
   });
 });
