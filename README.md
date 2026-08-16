@@ -81,8 +81,20 @@ item otherwise. `bin/interview.ts`, `bin/record-outcome.ts`, and `bin/split.ts`
 expose the other deterministic surfaces; run any without arguments to see its
 required files.
 
+Start the static Web UI and its local deterministic API adapter:
+
+```bash
+npm run ui
+```
+
+Then open `http://127.0.0.1:3000`. Set `SPEC_UI_PORT` to choose another local
+port. The browser layer is plain HTML, CSS, and JavaScript under `ui/public/`;
+the Node adapter exists so it can invoke the TypeScript kernel without adding a
+bundler or build step.
+
 ## Status
 
-The v0.1 MVP is complete: slices S0–S8 are implemented and recorded in
-`docs/BUILD-PLAN.md`. Profile and Shape still deliberately ship with no
-mechanism; they wait for a real cross-project conflict.
+The v0.1 kernel MVP is complete, and S9 adds its static Web UI: slices S0–S9 are
+implemented and recorded in `docs/BUILD-PLAN.md`. Profile and Shape still
+deliberately ship with no mechanism; they wait for a real cross-project
+conflict.

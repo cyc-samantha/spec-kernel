@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Specification workspace</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">SPEC KERNEL · LOCAL WORKSPACE</p>
+        <h1>Turn intent into a contract<br>another team can trust.</h1>
+      </div>
+      <div class="local-mark"><span></span> Local · deterministic</div>
+    </header>
+
+    <main>
+      <section class="workspace" aria-label="Specification inputs">
+        <div class="panel draft-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="step">01 · ASSERT</p>
+              <h2>Specification draft</h2>
+            </div>
+            <button id="load-example" class="button quiet" type="button">Load example</button>
+          </div>
+          <label class="sr-only" for="draft-input">Specification draft JSON</label>
+          <textarea id="draft-input" spellcheck="false" aria-describedby="draft-help"></textarea>
+          <p id="draft-help" class="hint">Edit the document directly. Missing values remain missing—nothing here guesses.</p>
+        </div>
+
+        <aside class="panel control-panel">
+          <div>
+            <p class="step">02 · CHECK</p>
+            <h2>Deterministic verdict</h2>
+            <p class="lede">The same rules serve both entry paths. No model grades the result.</p>
+          </div>
+
+          <div class="actions">
+            <button id="check-draft" class="button primary" type="button">Run seal-check</button>
+            <button id="next-question" class="button secondary" type="button">Get next question</button>
+          </div>
+
+          <details>
+            <summary>Project declaration</summary>
+            <label class="sr-only" for="project-input">Project declaration JSON</label>
+            <textarea id="project-input" class="project-input" spellcheck="false"></textarea>
+          </details>
+        </aside>
+      </section>
+
+      <section class="result-panel" aria-live="polite" aria-labelledby="result-title">
+        <div class="result-heading">
+          <div>
+            <p class="step">03 · HAND OFF</p>
+            <h2 id="result-title">Ready to check</h2>
+          </div>
+          <span id="status-badge" class="status idle">Not run</span>
+        </div>
+        <p id="result-summary" class="result-summary">Load the example or paste a specification, then run seal-check.</p>
+        <div id="question-card" class="question-card" hidden>
+          <p class="question-label">NEXT QUESTION</p>
+          <p id="question-text"></p>
+        </div>
+        <ol id="missing-list" class="missing-list"></ol>
+        <pre id="raw-output" class="raw-output" hidden></pre>
+      </section>
+    </main>
+
+    <footer>
+      <span>Human intent in</span><span class="line"></span><span>sealed specification out</span>
+    </footer>
+  </body>
+</html>

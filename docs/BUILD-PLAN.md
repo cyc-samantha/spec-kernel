@@ -303,6 +303,26 @@ Last on purpose: v1 may require a human to bring one bounded change.
 
 ---
 
+### S9 · Static Web UI — **DONE**
+
+`branch: s9-local-ui`
+
+A thin static JavaScript browser surface over the existing deterministic entry
+points, with a native Node adapter for local preview and API transport. It edits
+a draft and project declaration, runs seal-check, and advances one interview
+step. It owns no rule, question, entitlement, or verdict.
+
+- Native Node HTTP and browser APIs only: no framework, bundler, or build step.
+- Listens on loopback by default and calls no external service.
+- Untrusted specification text is rendered as text, never markup.
+- Malformed or oversized input is refused before it reaches a kernel function.
+
+**Done when**: the golden example seals through the HTTP API, an incomplete
+draft displays its Rule-derived missing item and next question, malformed input
+is refused, and `npm run ui` serves the browser surface locally.
+
+---
+
 ## Deliberately not built
 
 Written down so nobody rediscovers them mid-build.
