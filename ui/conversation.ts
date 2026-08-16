@@ -159,7 +159,9 @@ export async function converse(
   } catch (error) {
     const reason = error instanceof ModelPortError && error.failure === 'invalid_response'
       ? 'the configured model returned an invalid response'
-      : 'the configured model is unavailable';
+      : error instanceof ModelPortError && error.failure === 'timed_out'
+        ? 'the configured model request timed out'
+        : 'the configured model is unavailable';
     return { status: 'refused', state: current, reason };
   }
   const loaded = loadModelProposal(raw);

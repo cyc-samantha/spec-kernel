@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ModelPort } from '../ports/model.ts';
+import { ModelPortError, type ModelPort } from '../ports/model.ts';
 import { loadProjectDeclaration, type ProjectDeclaration } from '../ports/project.ts';
 import { converse, type ConversationState } from '../ui/conversation.ts';
 import { validSpecification } from './fixtures/valid-specification.ts';
@@ -164,6 +164,19 @@ describe('conversational specification intake', () => {
     expect(result).toEqual(expect.objectContaining({
       status: 'refused',
       reason: 'the configured model is unavailable',
+      state: expect.objectContaining({ draft: {} }),
+    }));
+  });
+
+  it('reports a timed-out model without calling it unavailable', async () => {
+    const initial = state({});
+    const model: ModelPort = {
+      complete: async () => { throw new ModelPortError('timed_out', 'deadline expired'); },
+    };
+    const result = await converse(initial, project(), 'local-user', 'Build an export screen.', model);
+    expect(result).toEqual(expect.objectContaining({
+      status: 'refused',
+      reason: 'the configured model request timed out',
       state: expect.objectContaining({ draft: {} }),
     }));
   });
