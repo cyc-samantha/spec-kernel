@@ -726,6 +726,37 @@ describe('conversational specification intake', () => {
     expect(result.state.proposals).toEqual([]);
   });
 
+  /*
+   * A live turn answered the title question and also returned a value for a gap
+   * that was not on offer. Refusing the whole turn cost the requester the answer
+   * they had actually given, to punish a mistake only the model made.
+   */
+  it('discards a candidate for a gap it was not offered and keeps the rest', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['title'];
+    delete draft['blockingDecisions'];
+
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'Map source columns onto the target schema.',
+      responses({
+        answers: [
+          { ruleId: 'title-stated', slot: 'title', value: 'Map source columns onto the target schema' },
+          { ruleId: 'target-named', slot: 'target', value: 'somewhere/else' },
+        ],
+        proposals: [],
+      }),
+    );
+
+    expect(result.status).toBe('ask');
+    expect(result.state.draft).toEqual(expect.objectContaining({
+      title: 'Map source columns onto the target schema',
+      target: 'example-repository',
+    }));
+  });
+
   it('refuses malformed model output instead of treating it as an answer', async () => {
     const result = await converse(
       state({}),

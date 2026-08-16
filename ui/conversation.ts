@@ -461,23 +461,25 @@ export async function converse(
   }
   const loaded = loadModelProposal(raw);
   if (!loaded.ok) return { status: 'refused', state: current, reason: loaded.reason };
-  if (loaded.proposal.answers.some((answer) => !presented.has(gapKey(answer)))) {
-    return { status: 'refused', state: current, reason: 'the model proposed an answer outside the offered Rule gaps' };
-  }
-  if (loaded.proposal.proposals.some((proposal) => !presented.has(gapKey(proposal)))) {
-    return { status: 'refused', state: current, reason: 'the model proposed a draft outside the offered Rule gaps' };
-  }
+  /*
+   * A candidate for a gap that was not offered is discarded, never honoured —
+   * the model writes only where it was asked. Refusing the whole turn over one
+   * would throw away the candidates that were in scope, and the requester's own
+   * words with them, to punish a mistake only the model made.
+   */
+  const inScope = <T extends { ruleId: string; slot: string }>(items: readonly T[]): T[] =>
+    items.filter((item) => presented.has(gapKey(item)));
 
   // A standing machine draft can become an answer only through the named,
   // deterministic confirmation route below. Letting the translator copy it
   // into answers would allow the model to approve its own proposal.
   const pending = new Map(current.proposals.map((proposal) => [gapKey(proposal), proposal]));
-  const supplied = humanSuppliedAnswers(pending, loaded.proposal.answers);
+  const supplied = humanSuppliedAnswers(pending, inScope(loaded.proposal.answers));
   const applied = applyModelAnswers(current, presented, supplied, identity, project);
   current = withDerivations(applied, project);
   current = {
     ...current,
-    proposals: mergeUsableProposals(current, state.proposals, loaded.proposal.proposals),
+    proposals: mergeUsableProposals(current, state.proposals, inScope(loaded.proposal.proposals)),
   };
   current = withAttempt(
     current,
