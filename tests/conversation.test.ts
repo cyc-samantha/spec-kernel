@@ -447,4 +447,19 @@ describe('conversational specification intake', () => {
       state: expect.objectContaining({ answers: [expect.objectContaining({ source: 'derived' })] }),
     }));
   });
+
+  /*
+   * "Unavailable" sends the requester to check a runtime that is running fine.
+   * An overrun window is a different problem with a different remedy.
+   */
+  it('names an overrun context window rather than calling the runtime unavailable', async () => {
+    const model: ModelPort = {
+      complete: async () => { throw new ModelPortError('context_exceeded', 'window overrun'); },
+    };
+    const result = await converse(state({}), project(), 'local-user', 'Build an export screen.', model);
+    expect(result).toEqual(expect.objectContaining({
+      status: 'refused',
+      reason: 'the conversation outgrew the configured model context window',
+    }));
+  });
 });
