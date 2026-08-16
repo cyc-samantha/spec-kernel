@@ -102,10 +102,10 @@ and proposals. Do not fill unrelated gaps with generic defaults. Leave a gap out
 no evidence. If a valueSchema requires several fields and the human did not explicitly supply every one,
 put the completed value in proposals, not answers. Missing information is not an explicit empty list.
 When the latest message enumerates items for an array field, preserve every item separately. Do not
-summarize concrete items into a generic category or keep an older, less specific pending list.
-When the latest message states a value for a pendingProposals slot, return what they stated in answers.
-Never repeat a pendingProposals value back unchanged as an answer: agreeing with your own draft is not
-something the human said. Never invent identifiers, file paths, or test names.
+summarize concrete items into a generic category.
+slotsAlreadyDrafted name gaps that already hold a draft the requester can accept on their own. Do not
+draft them again; return one only when the latest message states a value for it, and then in answers.
+Never invent identifiers, file paths, or test names.
 
 Return only answers and proposals. The application reports progress and asks the next question.
 Never claim that a specification is complete or sealed.`;
@@ -215,7 +215,7 @@ export class OllamaAdapter implements ModelPort, SplitPort {
         role: 'system',
         content: JSON.stringify({
           currentDraft: request.draft,
-          pendingProposals: request.proposals,
+          slotsAlreadyDrafted: request.drafted,
           focusGap: request.focus,
           gaps: request.missing,
         }),

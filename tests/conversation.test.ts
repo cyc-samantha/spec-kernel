@@ -213,14 +213,20 @@ describe('conversational specification intake', () => {
     ]);
   });
 
-  it('carries pending proposals into the next model turn and does not erase them', async () => {
+  /*
+   * A drafted value in the translator's view anchors a small model onto it: the
+   * turn that enumerated four column mappings came back with the one mapping the
+   * standing draft held. The slot name is what it needs — enough not to redraft,
+   * with nothing to copy.
+   */
+  it('tells the next model turn which slots are drafted without showing it the drafts', async () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['constraints'];
     delete draft['blockingDecisions'];
     const seen: unknown[] = [];
     const model: ModelPort = {
       complete: async (request) => {
-        seen.push(request.proposals);
+        seen.push(request.drafted);
         if (seen.length === 1) {
           return {
             assistantMessage: 'I drafted the remaining constraints.',
@@ -249,9 +255,7 @@ describe('conversational specification intake', () => {
     const second = await converse(first.state, project(), 'local-user', 'There are no blocking decisions.', model);
 
     expect(seen[0]).toEqual([]);
-    expect(seen[1]).toEqual([
-      expect.objectContaining({ slot: 'constraints', value: [] }),
-    ]);
+    expect(seen[1]).toEqual(['constraints']);
     expect(second.state.proposals).toEqual([
       expect.objectContaining({ slot: 'constraints', value: [] }),
     ]);

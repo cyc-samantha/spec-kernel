@@ -17,12 +17,7 @@ function request(): ModelRequest {
       valueSchema: { type: 'array' },
       message: 'blockingDecisions must be explicitly declared',
     },
-    proposals: [{
-      ruleId: 'constraints-declared',
-      slot: 'constraints',
-      value: [],
-      reason: 'the requester named no constraints',
-    }],
+    drafted: ['constraints'],
     missing: [{
       ruleId: 'blocking-decisions-declared',
       slot: 'blockingDecisions',
@@ -84,15 +79,17 @@ describe('Ollama model adapter', () => {
     }));
     expect(JSON.stringify(body)).toContain('blocking-decisions-declared');
     expect(JSON.stringify(body)).toContain('blockingDecisions');
-    expect(JSON.stringify(body)).toContain('pendingProposals');
+    expect(JSON.stringify(body)).toContain('slotsAlreadyDrafted');
     expect(JSON.stringify(body)).toContain('focusGap');
-    expect(JSON.stringify(body)).toContain('the requester named no constraints');
+    // A drafted value in view anchors a small model onto it: the same turn that
+    // reported four column mappings returned one when the draft was included.
+    expect(JSON.stringify(body)).not.toContain('the requester named no constraints');
     expect(JSON.stringify(body)).toContain('Never claim that a specification is complete or sealed');
     expect(JSON.stringify(body)).toContain('Do not fill unrelated gaps with generic defaults');
     expect(JSON.stringify(body)).toContain('corrects a pending proposal');
     expect(JSON.stringify(body)).toContain('Missing information is not an explicit empty list');
     expect(JSON.stringify(body)).toContain('preserve every item separately');
-    expect(JSON.stringify(body)).toContain('Never repeat a pendingProposals value back unchanged as an answer');
+    expect(JSON.stringify(body)).toContain('slotsAlreadyDrafted name gaps that already hold a draft');
     expect(JSON.stringify(body['format'])).not.toContain('assistantMessage');
   });
 

@@ -454,7 +454,7 @@ export async function converse(
       draft: current.draft,
       focus,
       missing: [...presented.values()],
-      proposals: current.proposals,
+      drafted: current.proposals.map((proposal) => proposal.slot),
     });
   } catch (error) {
     return { status: 'refused', state: current, reason: modelRefusalReason(error, 'conversation') };
