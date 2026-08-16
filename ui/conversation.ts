@@ -214,23 +214,38 @@ function terminalResult(
   return undefined;
 }
 
+/*
+ * A candidate its rule refuses is dropped, and which ones were dropped comes
+ * back with the state. Dropping one in silence leaves the requester told they
+ * did not answer a question they did answer — the failure was the translation.
+ */
+interface AppliedAnswers {
+  state: ConversationState;
+  refused: readonly string[];
+}
+
 function applyModelAnswers(
   state: ConversationState,
   offered: Map<string, MissingItem>,
   answers: readonly { ruleId: string; slot: string; value: unknown }[],
   identity: string,
   project: ProjectDeclaration,
-): ConversationState {
+): AppliedAnswers {
   let current = state;
+  const refused: string[] = [];
   for (const answer of answers) {
     const missing = offered.get(gapKey(answer))!;
     const candidate = resolves(current.draft, missing, answer.value);
-    if (candidate === undefined) continue;
-    const recorded = recordAnswer(current.answers, missing, { value: answer.value, answeredBy: identity }, project);
-    if (recorded.kind !== 'recorded') continue;
+    const recorded = candidate === undefined
+      ? undefined
+      : recordAnswer(current.answers, missing, { value: answer.value, answeredBy: identity }, project);
+    if (candidate === undefined || recorded?.kind !== 'recorded') {
+      refused.push(missing.slot);
+      continue;
+    }
     current = { ...current, draft: candidate, answers: recorded.history };
   }
-  return current;
+  return { state: current, refused };
 }
 
 /*
@@ -350,12 +365,18 @@ function authorityNaming(slots: readonly string[]): string {
   return `${slots.join(', ')} decides what an Agent may do unsupervised, so I cannot take a general yes for it. Say "confirm ${slots[0]}" to grant it, or tell me what it should say instead.`;
 }
 
+/*
+ * `explained` means the message above already says why this gap did not move.
+ * Following it with the generic "I still do not have a value for this" repeats
+ * the bad news without adding to it.
+ */
 function askResult(
   state: ConversationState,
   step: Extract<ReturnType<typeof advanceInterview>, { status: 'ask' }>,
   progressMessage: string,
+  explained = false,
 ): ConversationResult {
-  const prompt = promptFor(state, step);
+  const prompt = explained ? step.missing.question : promptFor(state, step);
   return {
     status: 'ask',
     state: withAssistant(state, [progressMessage, prompt].filter(Boolean).join('\n\n')),
@@ -404,6 +425,16 @@ function howToAccept(drafted: readonly SlotProposal[]): string {
   const named = granting.map((item) => `"confirm ${item.slot}"`).join(', ');
   const others = drafted.length > granting.length ? ' "yes" takes the others.' : '';
   return `Say ${named} to grant that — a general yes cannot.${others} Or tell me what to change.`;
+}
+
+/*
+ * Names the slot whose candidate its rule refused. Reporting nothing left the
+ * requester reading that they had not answered a question they had answered,
+ * with no way to tell that the failure had happened after their words.
+ */
+function misfitMessage(refused: readonly string[]): string {
+  if (refused.length === 0) return '';
+  return `I could not use that as ${refused.join(', ')} — the value did not fit the shape that slot requires. Say it again in a different way and I will try once more.`;
 }
 
 /** The ledger narrates progress; model prose cannot claim writes that did not happen. */
@@ -505,7 +536,7 @@ export async function converse(
   const pending = new Map(current.proposals.map((proposal) => [gapKey(proposal), proposal]));
   const supplied = humanSuppliedAnswers(pending, inScope(loaded.proposal.answers));
   const applied = applyModelAnswers(current, presented, supplied, identity, project);
-  current = withDerivations(applied, project);
+  current = withDerivations(applied.state, project);
   current = {
     ...current,
     proposals: mergeUsableProposals(current, state.proposals, inScope(loaded.proposal.proposals)),
@@ -519,7 +550,8 @@ export async function converse(
     correctionIsNew,
   );
   const progress = progressMessage(beforeAnswerCount, state.proposals, current);
-  const narration = progress || (correctionIsNew ? untranslated(focus.slot) : '');
+  const narration = [progress, misfitMessage(applied.refused)].filter(Boolean).join(' ')
+    || (correctionIsNew ? untranslated(focus.slot) : '');
 
   const step = nextStep(current, project, identity);
   const terminal = terminalResult(step, current, narration);
@@ -527,7 +559,7 @@ export async function converse(
   if (step.status !== 'ask') {
     return { status: 'refused', state: current, reason: 'the next Rule question could not be selected' };
   }
-  return askResult(current, step, narration);
+  return askResult(current, step, narration, applied.refused.includes(step.missing.slot));
 }
 
 function confirmOne(

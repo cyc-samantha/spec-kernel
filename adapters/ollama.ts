@@ -1,3 +1,4 @@
+import type { MissingItem } from '../kernel/seal-check.ts';
 import {
   ModelPortError,
   type ModelPort,
@@ -21,34 +22,41 @@ const DEFAULT_CONTEXT_TOKENS = 16_384;
 const DEFAULT_KEEP_ALIVE = '10m';
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 
-const valueEntry = {
-  type: 'object',
-  properties: {
-    ruleId: { type: 'string', minLength: 1 },
-    slot: { type: 'string', minLength: 1 },
-    value: {},
-  },
-  required: ['ruleId', 'slot', 'value'],
-  additionalProperties: false,
-} as const;
+/*
+ * An unconstrained `value` leaves the translator to guess a shape, and it
+ * guesses a self-describing one: qwen3.5:4b answered the title question with
+ * {"kind":"string","value":"data mapping tool"} — the right answer inside an
+ * envelope no rule would accept. Each gap already carries the shape its value
+ * must take, so the runtime is made to enforce it rather than the application
+ * to refuse it afterwards.
+ */
+function answerVariant(gap: MissingItem, withReason: boolean): Record<string, unknown> {
+  const properties: Record<string, unknown> = {
+    ruleId: { type: 'string', enum: [gap.ruleId] },
+    slot: { type: 'string', enum: [gap.slot] },
+    value: valueShape(gap),
+  };
+  if (withReason) properties['reason'] = { type: 'string', minLength: 1 };
+  const required = withReason ? ['ruleId', 'slot', 'value', 'reason'] : ['ruleId', 'slot', 'value'];
+  return { type: 'object', properties, required, additionalProperties: false };
+}
 
-const proposalFormat = {
-  type: 'object',
-  properties: {
-    answers: { type: 'array', maxItems: 2, items: valueEntry },
-    proposals: {
-      type: 'array',
-      maxItems: 2,
-      items: {
-        ...valueEntry,
-        properties: { ...valueEntry.properties, reason: { type: 'string', minLength: 1 } },
-        required: ['ruleId', 'slot', 'value', 'reason'],
-      },
-    },
-  },
-  required: ['answers', 'proposals'],
-  additionalProperties: false,
-} as const;
+function entryList(gaps: readonly MissingItem[], withReason: boolean): Record<string, unknown> {
+  return {
+    type: 'array',
+    maxItems: 2,
+    items: { anyOf: gaps.map((gap) => answerVariant(gap, withReason)) },
+  };
+}
+
+function proposalFormatFor(gaps: readonly MissingItem[]): Record<string, unknown> {
+  return {
+    type: 'object',
+    properties: { answers: entryList(gaps, false), proposals: entryList(gaps, true) },
+    required: ['answers', 'proposals'],
+    additionalProperties: false,
+  };
+}
 
 const splitFormat = {
   type: 'object',
@@ -173,6 +181,22 @@ async function responseText(response: Response): Promise<string> {
   return text;
 }
 
+/*
+ * Every field beside the value is one the translator can copy into it, and both
+ * local models measured did: 2b answered the title question with the gap's own
+ * valueSchema, Zod refusal string and all. A gap is reduced to what translating
+ * it requires — who may fill it and why it was refused are the application's
+ * concerns, not a translation's.
+ */
+function valueShape(gap: MissingItem): Record<string, unknown> {
+  const { $schema: _dropped, ...shape } = (gap.valueSchema ?? {}) as Record<string, unknown>;
+  return shape;
+}
+
+function translatable(gap: MissingItem): Record<string, unknown> {
+  return { ruleId: gap.ruleId, slot: gap.slot, question: gap.question, valueSchema: valueShape(gap) };
+}
+
 function structuredContent(envelope: Record<string, unknown>): unknown {
   const message = envelope['message'];
   const content = typeof message === 'object' && message !== null
@@ -211,7 +235,7 @@ export class OllamaAdapter implements ModelPort, SplitPort {
   }
 
   async complete(request: ModelRequest): Promise<unknown> {
-    return this.#ask(proposalFormat, [
+    return this.#ask(proposalFormatFor(request.missing), [
       { role: 'system', content: systemPrompt },
       ...request.messages,
       {
@@ -219,8 +243,8 @@ export class OllamaAdapter implements ModelPort, SplitPort {
         content: JSON.stringify({
           currentDraft: request.draft,
           slotsAlreadyDrafted: request.drafted,
-          focusGap: request.focus,
-          gaps: request.missing,
+          focusGap: translatable(request.focus),
+          gaps: request.missing.map(translatable),
         }),
       },
     ]);

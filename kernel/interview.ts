@@ -80,6 +80,9 @@ export function advanceInterview(
     };
   }
 
-  const prefix = stalls === 1 ? 'That did not answer the question I asked. ' : '';
+  // WHY: the kernel knows the gap is still open after an attempt. Whether the
+  // requester declined or the translation failed is not visible from here, and
+  // a prefix that blames them is wrong exactly when the translation was.
+  const prefix = stalls === 1 ? 'I still do not have a value for this. ' : '';
   return { status: 'ask', missing: next, prompt: `${prefix}${next.question}` };
 }

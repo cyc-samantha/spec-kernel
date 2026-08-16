@@ -94,6 +94,45 @@ describe('Ollama model adapter', () => {
     expect(JSON.stringify(body['format'])).not.toContain('assistantMessage');
   });
 
+  /*
+   * With `value` unconstrained, qwen3.5:4b answered the title question with
+   * {"kind":"string","value":"data mapping tool"} — the right answer inside an
+   * envelope it invented because nothing said what shape to produce. The gap's
+   * own schema is the shape, so it belongs in the format the runtime enforces.
+   */
+  it('constrains each answer value to the schema of the gap it answers', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(reply({}));
+    await new OllamaAdapter({ model: 'local-model', fetch: fetchMock }).complete(request());
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)) as {
+      format: { properties: { answers: { items: { anyOf: Record<string, any>[] } } } };
+    };
+
+    const variants = body.format.properties.answers.items.anyOf;
+    expect(variants).toHaveLength(1);
+    expect(variants[0]!['properties']['slot']).toEqual({ type: 'string', enum: ['blockingDecisions'] });
+    expect(variants[0]!['properties']['value']).toEqual({ type: 'array' });
+    expect(JSON.stringify(body.format)).not.toContain('"value":{}');
+  });
+
+  /*
+   * Measured on qwen3.5:2b and :4b answering "data mapping tool" to the title
+   * question: both returned a title whose value was the gap's own neighbouring
+   * fields — 2b returned the valueSchema itself, Zod refusal string included.
+   * A gap carrying eight fields invites the translator to merge them.
+   */
+  it('hands the translator only what a translation needs from a gap', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(reply({}));
+    await new OllamaAdapter({ model: 'local-model', fetch: fetchMock }).complete(request());
+    const body = String(fetchMock.mock.calls[0]![1]?.body);
+
+    expect(body).toContain('blocking-decisions-declared');
+    expect(body).toContain('Which decisions are still open');
+    expect(body).toContain('valueSchema');
+    expect(body).not.toContain('blockingDecisions must be explicitly declared');
+    expect(body).not.toContain('human_confirms');
+    expect(body).not.toContain('$schema');
+  });
+
   it('refuses an unavailable runtime', async () => {
     const adapter = new OllamaAdapter({
       model: 'local-model',
