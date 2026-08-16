@@ -15,6 +15,7 @@ export interface ModelRequest {
   messages: readonly ConversationMessage[];
   draft: unknown;
   missing: readonly MissingItem[];
+  valueSchema: unknown;
 }
 
 /**

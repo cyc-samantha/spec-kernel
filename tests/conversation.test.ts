@@ -74,6 +74,19 @@ describe('conversational specification intake', () => {
     expect(complete).toHaveBeenCalledOnce();
   });
 
+  it('gives the translator the exact slot schema instead of asking it to guess shapes', async () => {
+    let valueSchema: unknown;
+    const model: ModelPort = {
+      complete: async (request) => {
+        valueSchema = request.valueSchema;
+        return { assistantMessage: 'More detail is needed.', answers: [] };
+      },
+    };
+    await converse(state({}), project(), 'local-user', 'Build a CSV export.', model);
+    expect(JSON.stringify(valueSchema)).toContain('"kind":{"type":"string","enum":["change","spike"]}');
+    expect(JSON.stringify(valueSchema)).toContain('"blockingDecisions":{"type":"array"');
+  });
+
   it('allows the same entitled user to complete a technical gap without changing the rule', async () => {
     const draft = validSpecification();
     delete draft.acceptance[1]!.targetTest;

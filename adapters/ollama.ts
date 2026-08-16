@@ -33,6 +33,8 @@ const systemPrompt = `You translate human answers into one structured specificat
 Use only facts stated by the human in the conversation. Never invent an answer.
 The supplied gaps and questions originate in deterministic Rules.
 Return an answers entry only for a gap the human actually answered. Copy its ruleId and slot exactly.
+Use the supplied valueSchema to produce the exact JSON type and shape for each slot.
+You may translate or summarize facts the human stated, but do not invent identifiers, paths, tests, decisions, or policy.
 Put the exact JSON value for that supplied slot in value. Omit unanswered gaps from answers.
 assistantMessage briefly explains what was or was not understood; do not ask another question.
 Never claim that a specification is complete or sealed.`;
@@ -121,6 +123,7 @@ export class OllamaAdapter implements ModelPort {
               content: JSON.stringify({
                 currentDraft: request.draft,
                 gaps: request.missing,
+                valueSchema: request.valueSchema,
               }),
             },
           ],
