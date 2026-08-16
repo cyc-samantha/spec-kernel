@@ -14,8 +14,11 @@ function request(): ModelRequest {
     missing: [{
       ruleId: 'blocking-decisions-declared',
       slot: 'blockingDecisions',
-      question: 'Were blocking decisions considered, and which decisions remain?',
+      question: 'Which decisions are still open and block this work? An empty list is an answer.',
       entitlement: 'requester',
+      authorship: 'human_confirms',
+      consequence: 'routine',
+      valueSchema: { type: 'array' },
       message: 'blockingDecisions must be explicitly declared',
     }],
   };

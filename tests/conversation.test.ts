@@ -54,10 +54,14 @@ describe('conversational specification intake', () => {
     delete (draft['scope'] as Record<string, unknown>)['exclude'];
     delete draft['constraints'];
     const complete = vi.fn().mockResolvedValue({
-      assistantMessage: 'I recorded the boundary and open-decision state.',
+      assistantMessage: 'I recorded the boundary and the constraint.',
       answers: [
-        { ruleId: 'required-slots', slot: 'scope.exclude', value: ['generated/**'] },
-        { ruleId: 'required-slots', slot: 'constraints', value: ['keep the wire format stable'] },
+        {
+          ruleId: 'scope-bounded',
+          slot: 'scope',
+          value: { include: ['src/export/**'], exclude: ['generated/**'] },
+        },
+        { ruleId: 'constraints-declared', slot: 'constraints', value: ['keep the wire format stable'] },
       ],
     });
 
@@ -152,7 +156,7 @@ describe('conversational specification intake', () => {
     expect(result).toEqual(expect.objectContaining({
       status: 'ask',
       missing: expect.objectContaining({ ruleId: 'blocking-decisions-declared' }),
-      prompt: 'That did not answer the question I asked. Were blocking decisions considered, and which decisions remain?',
+      prompt: 'That did not answer the question I asked. Which decisions are still open and block this work? An empty list is an answer.',
     }));
   });
 

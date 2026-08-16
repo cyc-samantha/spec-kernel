@@ -77,11 +77,11 @@ describe('Conversational UI API', () => {
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toEqual(expect.objectContaining({
       status: 'ask',
-      missing: expect.objectContaining({ ruleId: 'required-slots' }),
-      prompt: 'What value belongs in each missing required specification slot?',
+      missing: expect.objectContaining({ ruleId: 'intent-declared' }),
+      prompt: 'Is this a change to the system, or a spike that produces knowledge?',
       state: expect.objectContaining({
         messages: [expect.objectContaining({
-          content: expect.stringContaining('What value belongs in each missing required specification slot?'),
+          content: expect.stringContaining('Is this a change to the system, or a spike that produces knowledge?'),
         })],
       }),
     }));

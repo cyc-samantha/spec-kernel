@@ -18,7 +18,7 @@ describe('the assert-first path', () => {
     const result = assessDraft(draft);
     expect(result.status).toBe('incomplete');
     expect(result).toEqual(expect.objectContaining({ draft }));
-    expect(result.missing).not.toEqual([]);
+    expect(result.status === 'incomplete' && result.missing.length).toBeGreaterThan(0);
   });
 
   it('does not accept its own proposal as a requirement', () => {

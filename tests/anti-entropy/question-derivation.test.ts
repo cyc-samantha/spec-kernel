@@ -16,11 +16,28 @@ interface QuestionFixture {
   removeAnswer(specification: Specification): unknown;
 }
 
+function dropSlot(specification: Specification, slot: keyof Specification): unknown {
+  delete (specification as Partial<Specification>)[slot];
+  return specification;
+}
+
 const fixtures: readonly QuestionFixture[] = [
+  { ruleId: 'intent-declared', removeAnswer: (spec) => dropSlot(spec, 'intent') },
+  { ruleId: 'specification-identified', removeAnswer: (spec) => dropSlot(spec, 'id') },
+  { ruleId: 'title-stated', removeAnswer: (spec) => dropSlot(spec, 'title') },
+  { ruleId: 'target-named', removeAnswer: (spec) => dropSlot(spec, 'target') },
+  { ruleId: 'scope-bounded', removeAnswer: (spec) => dropSlot(spec, 'scope') },
+  { ruleId: 'constraints-declared', removeAnswer: (spec) => dropSlot(spec, 'constraints') },
+  { ruleId: 'acceptance-stated', removeAnswer: (spec) => dropSlot(spec, 'acceptance') },
+  { ruleId: 'context-declared', removeAnswer: (spec) => dropSlot(spec, 'context') },
+  { ruleId: 'authority-granted', removeAnswer: (spec) => dropSlot(spec, 'authority') },
+  { ruleId: 'irreversibility-classified', removeAnswer: (spec) => dropSlot(spec, 'irreversibility') },
+  { ruleId: 'risk-classified', removeAnswer: (spec) => dropSlot(spec, 'risk') },
+  { ruleId: 'dependencies-declared', removeAnswer: (spec) => dropSlot(spec, 'dependsOn') },
   {
-    ruleId: 'required-slots',
+    ruleId: 'blocking-decisions-declared',
     removeAnswer(specification) {
-      delete (specification as Partial<Specification>).title;
+      delete (specification as Partial<Specification>).blockingDecisions;
       return specification;
     },
   },
@@ -35,13 +52,6 @@ const fixtures: readonly QuestionFixture[] = [
     ruleId: 'unique-criterion-ids',
     removeAnswer(specification) {
       specification.acceptance[1]!.id = specification.acceptance[0]!.id;
-      return specification;
-    },
-  },
-  {
-    ruleId: 'blocking-decisions-declared',
-    removeAnswer(specification) {
-      delete (specification as Partial<Specification>).blockingDecisions;
       return specification;
     },
   },
@@ -79,6 +89,22 @@ describe('question derivation', () => {
   it('has exactly one load-bearing fixture for every rule', () => {
     expect(fixtures).toHaveLength(rules.length);
     expect(fixtures.map((fixture) => fixture.ruleId)).toEqual(rules.map((rule) => rule.id));
+  });
+
+  /*
+   * A question shared by two rules cannot tell a person which gap it is about.
+   * One wording covering many slots is how an interview repeats itself until
+   * the requester gives up, so the wording is part of the derivation.
+   */
+  it('gives every rule a question no other rule asks', () => {
+    const questions = rules.map((rule) => rule.question);
+    expect(new Set(questions).size).toBe(rules.length);
+  });
+
+  it('asks a distinct question for every gap in an empty draft', () => {
+    const missing = sealCheck({});
+    expect(missing.length).toBeGreaterThan(1);
+    expect(new Set(missing.map((item) => item.question)).size).toBe(missing.length);
   });
 
   it.each(fixtures)('$ruleId becomes missing when its answer is removed', (fixture) => {
