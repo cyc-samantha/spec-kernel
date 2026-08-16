@@ -519,23 +519,7 @@ export function confirmProposals(
   slots: readonly string[],
 ): ConversationResult {
   const named = new Set(slots);
-  const selected = state.proposals
-    .filter((proposal) => named.has(proposal.slot))
-    .map((proposal) => ({ slot: proposal.slot, value: proposal.value }));
-  return confirmProposalValues(state, project, identity, selected);
-}
-
-/** Validates human-edited drafts through the same Rule before recording them. */
-export function confirmProposalValues(
-  state: ConversationState,
-  project: ProjectDeclaration,
-  identity: string,
-  selections: readonly { slot: string; value: unknown }[],
-): ConversationResult {
-  const selected = selections.flatMap((selection) => {
-    const proposal = state.proposals.find((candidate) => candidate.slot === selection.slot);
-    return proposal ? [{ ...proposal, value: selection.value }] : [];
-  });
+  const selected = state.proposals.filter((proposal) => named.has(proposal.slot));
   if (selected.length === 0) {
     return { status: 'refused', state, reason: 'a confirmation must name at least one drafted slot' };
   }
