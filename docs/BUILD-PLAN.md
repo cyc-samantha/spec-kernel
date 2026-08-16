@@ -187,7 +187,7 @@ and removing any one slot makes exactly the corresponding rule report.
 
 ---
 
-### S2 · The question-derivation test
+### S2 · The question-derivation test — **DONE**
 
 `branch: s2-question-derivation`
 
