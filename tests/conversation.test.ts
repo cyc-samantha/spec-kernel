@@ -628,6 +628,38 @@ describe('conversational specification intake', () => {
     expect(corrected.state.attempts.at(-1)?.yieldedNewInformation).toBe(true);
   });
 
+  it('routes an unparsed pending correction to the editable draft without stalling', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['title'];
+    delete draft['scope'];
+    const carried: ConversationState = {
+      ...state(draft),
+      proposals: [{
+        ruleId: 'scope-bounded',
+        slot: 'scope',
+        question: 'What is inside this change, and what is explicitly outside it?',
+        value: { include: ['mapping logic'], exclude: [] },
+        reason: 'drafted from the initial description',
+        consequence: 'routine',
+        entitlement: 'requester',
+      }],
+    };
+
+    const result = await converse(
+      carried,
+      project(),
+      'local-user',
+      'scope include first name to surname and date of birth to DOB',
+      responses({ answers: [], proposals: [] }),
+    );
+
+    expect(result.state.attempts.at(-1)?.yieldedNewInformation).toBe(true);
+    expect(result.state.messages.at(-1)?.content).toContain(
+      'I could not apply the scope correction automatically. Edit that drafted JSON value above, then confirm it.',
+    );
+    expect(result.state.messages.at(-1)?.content).not.toContain('That did not answer');
+  });
+
   it('refuses a confirmation that names no drafted slot', () => {
     const result = confirmProposals(state({}), project(), 'local-user', []);
     expect(result).toEqual(expect.objectContaining({

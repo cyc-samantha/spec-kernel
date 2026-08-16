@@ -283,11 +283,12 @@ function movedForward(
   asked: MissingItem,
   proposalsBefore: readonly SlotProposal[],
   answerCountBefore: number,
+  recognizedCorrection: boolean,
 ): boolean {
   // One inference may extract several offered gaps. Information supplied out
   // of Rule order still advances the specification and must not count as a
   // stalled answer to whichever gap happened to be displayed.
-  if (state.answers.length > answerCountBefore) return true;
+  if (recognizedCorrection || state.answers.length > answerCountBefore) return true;
   const key = gapKey(asked);
   if (!sealCheck(state.draft).some((item) => gapKey(item) === key)) return true;
   const prior = new Map(proposalsBefore.map((proposal) => [gapKey(proposal), proposal]));
@@ -300,12 +301,19 @@ function withAttempt(
   prompt: string,
   proposalsBefore: readonly SlotProposal[],
   answerCountBefore: number,
+  recognizedCorrection = false,
 ): ConversationState {
   const attempt = {
     ruleId: asked.ruleId,
     slot: asked.slot,
     wording: prompt,
-    yieldedNewInformation: movedForward(state, asked, proposalsBefore, answerCountBefore),
+    yieldedNewInformation: movedForward(
+      state,
+      asked,
+      proposalsBefore,
+      answerCountBefore,
+      recognizedCorrection,
+    ),
   };
   return { ...state, attempts: [...state.attempts, attempt] };
 }
@@ -406,6 +414,9 @@ export async function converse(
   const beforeAnswerCount = current.answers.length;
   const focus = modelFocus(userMessage, current.proposals, offered, initialStep.missing);
   const isFocusedCorrection = gapKey(focus) !== gapKey(initialStep.missing);
+  const correctionIsNew = isFocusedCorrection && !state.messages.some(
+    (message) => message.role === 'user' && message.content === userMessage,
+  );
   const presented = isFocusedCorrection
     ? new Map([[gapKey(focus), focus]])
     : offered;
@@ -447,8 +458,18 @@ export async function converse(
       [...redirected, ...loaded.proposal.proposals],
     ),
   };
-  current = withAttempt(current, initialStep.missing, initialStep.prompt, proposalsBefore, beforeAnswerCount);
-  const narration = progressMessage(beforeAnswerCount, state.proposals, current);
+  current = withAttempt(
+    current,
+    initialStep.missing,
+    initialStep.prompt,
+    proposalsBefore,
+    beforeAnswerCount,
+    correctionIsNew,
+  );
+  const progress = progressMessage(beforeAnswerCount, state.proposals, current);
+  const narration = progress || (correctionIsNew
+    ? `I could not apply the ${focus.slot} correction automatically. Edit that drafted JSON value above, then confirm it.`
+    : '');
 
   const step = nextStep(current, project, identity);
   const terminal = terminalResult(step, current, narration);
