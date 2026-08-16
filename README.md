@@ -42,12 +42,18 @@ conflict demands it, not before.
 ## Two doors, one kernel
 
 An engineer writes a draft and the kernel finds the holes. Someone who cannot
-write a draft is asked, one question at a time. Same slots, same checks — only the
-direction of information flow differs, and a finished specification does not
-reveal which door it came through.
+write a draft never has to invent one: slots with a single correct value are
+derived and never asked, and the rest are drafted by the model — each with the
+reason it rests on — for that person to correct or confirm. Same slots, same
+checks, and a finished specification does not reveal which door it came through.
 
 The questions are not authored. They are derived from the checks: a question
-exists exactly when there is a downstream refusal it prevents.
+exists exactly when there is a downstream refusal it prevents, and each rule
+owns exactly one slot and one wording.
+
+A machine draft is not an answer. It is held beside the document until a named
+person accepts it, and the slots that decide what an Agent may do unsupervised
+must be accepted one at a time.
 
 The workflow packaging and verdict remain model- and vendor-neutral: each door
 is a plain `SKILL.md`, `ports/model.ts` is the only application-facing model
@@ -58,7 +64,8 @@ contract, and every verdict remains TypeScript that can run without a model.
 | Surface | Purpose |
 |---|---|
 | `kernel/specification.ts` | the slot schema handed toward execution |
-| `kernel/rules.ts` | each deterministic check, question, and entitlement in one object |
+| `kernel/rules.ts` | each deterministic check, question, entitlement, and authorship in one object |
+| `kernel/derivations.ts` | the slots nobody is asked about, because one value is already correct |
 | `kernel/seal-check.ts` | the complete missing-item verdict |
 | `ports/project.ts` | repository boundary, entitlement identities, and signer |
 | `skills/draft-specification/` | assert-first intake |

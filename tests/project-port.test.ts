@@ -58,9 +58,9 @@ describe('project declaration port', () => {
 
 describe('slot entitlement', () => {
   const requesterGap = {
-    ruleId: 'required-slots' as const,
-    slot: 'scope.exclude',
-    question: 'What is excluded?',
+    ruleId: 'scope-bounded' as const,
+    slot: 'scope',
+    question: 'What is inside this change, and what is explicitly outside it?',
     entitlement: 'requester' as const,
     message: 'missing',
   };
@@ -73,7 +73,7 @@ describe('slot entitlement', () => {
 
     expect(result).toEqual({
       kind: 'recorded',
-      history: [expect.objectContaining({ slot: 'scope.exclude', answeredBy: 'requester@example.test' })],
+      history: [expect.objectContaining({ slot: 'scope', answeredBy: 'requester@example.test', source: 'human' })],
     });
   });
 
@@ -86,7 +86,7 @@ describe('slot entitlement', () => {
     expect(result).toEqual({
       kind: 'handoff',
       history: [],
-      slot: 'scope.exclude',
+      slot: 'scope',
       required: 'requester',
       answeredBy: 'engineer@example.test',
     });
