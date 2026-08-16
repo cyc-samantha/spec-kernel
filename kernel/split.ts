@@ -30,6 +30,7 @@ export const splitProposalSchema = z.discriminatedUnion('verdict', [
 ]);
 
 export type ParentIntent = z.infer<typeof parentIntentSchema>;
+export type ProposedContract = z.infer<typeof proposedContractSchema>;
 export type SplitProposal = z.infer<typeof splitProposalSchema>;
 
 export type ParentIntentDerivation =
