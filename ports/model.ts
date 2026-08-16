@@ -11,31 +11,49 @@ export const conversationMessageSchema = z.object({
 
 export type ConversationMessage = z.infer<typeof conversationMessageSchema>;
 
+/*
+ * Each gap carries its own value schema, so the translator is never asked to
+ * locate the right fragment of a whole-document schema before it can answer.
+ */
 export interface ModelRequest {
   messages: readonly ConversationMessage[];
   draft: unknown;
   missing: readonly MissingItem[];
-  valueSchema: unknown;
 }
 
 /**
- * A model proposes a value for exactly the Rule-derived gap it was given.
+ * A model returns a value for exactly the Rule-derived gap it was given.
  * The application boundary applies and checks it; the model never returns a
  * seal verdict.
  */
-const proposedAnswerSchema = z.object({
+const answerSchema = z.object({
   ruleId: nonBlank,
   slot: nonBlank,
-  value: z.unknown().refine((value) => value !== undefined, 'a proposed answer needs a value'),
+  value: z.unknown().refine((value) => value !== undefined, 'an answer needs a value'),
 }).strict();
+
+/*
+ * A value the human has not agreed to yet. It carries a reason because a value
+ * whose grounds a person cannot see is not something they can confirm — they
+ * can only rubber-stamp it.
+ */
+const draftedValueSchema = answerSchema.extend({ reason: nonBlank });
+
+function duplicated(entries: readonly { ruleId: string; slot: string }[]): boolean {
+  const keys = entries.map((entry) => `${entry.ruleId}\u0000${entry.slot}`);
+  return new Set(keys).size !== keys.length;
+}
 
 export const modelProposalSchema = z.object({
   assistantMessage: nonBlank,
-  answers: z.array(proposedAnswerSchema).max(64),
+  answers: z.array(answerSchema).max(64),
+  proposals: z.array(draftedValueSchema).max(64).default([]),
 }).strict().superRefine((proposal, context) => {
-  const keys = proposal.answers.map((answer) => `${answer.ruleId}\u0000${answer.slot}`);
-  if (new Set(keys).size !== keys.length) {
-    context.addIssue({ code: 'custom', path: ['answers'], message: 'proposed answers must be unique' });
+  if (duplicated(proposal.answers)) {
+    context.addIssue({ code: 'custom', path: ['answers'], message: 'answers must be unique' });
+  }
+  if (duplicated(proposal.proposals)) {
+    context.addIssue({ code: 'custom', path: ['proposals'], message: 'proposals must be unique' });
   }
 });
 

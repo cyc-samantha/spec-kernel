@@ -46,14 +46,14 @@ L2 and L3 exist and work. This repository is the missing front half.
 | # | Decision |
 |---|---|
 | **D5** | Purity is enforced by tests, not by rules. `kernel-purity`: no project name, no domain vocabulary, no host inside `kernel/`. `examples/` is not scanned. |
-| **D6** | **The question set is derived from the seal-check rules, never authored.** One extra question means somebody put a personal best practice in the kernel; one missing question means a gate will refuse downstream something a human was never asked about. |
+| **D6** | **The question set is derived from the seal-check rules, never authored.** One extra question means somebody put a personal best practice in the kernel; one missing question means a gate will refuse downstream something a human was never asked about. The wording is part of the derivation: one rule owns exactly one slot and one question, because a wording shared by many slots cannot tell a person which gap it means (S11). |
 | **D7** | 1→N acceptance: **two unrelated projects onboard with zero edits to `kernel/`.** |
 
 ## The interview
 
 | # | Decision |
 |---|---|
-| **D8** | The interviewer **may not answer its own question.** It may propose; a proposal is marked `provenance: proposed`, and `proposed` cannot pass seal-check. |
+| **D8** | The interviewer **may not answer its own question.** It may propose; a proposal is held beside the draft, never inside it, and becomes an answer only when an entitled person names the slot they accept (see D26). A draft that arrives with `provenance: proposed` is refused by the same rule. |
 | **D9** | Stop condition is **seal-check reaching zero**, not a question count and not a turn count. |
 | **D10** | The same question asked twice in different words, yielding nothing new, is not a question — it is a `blocking_decision`. (The interview can fixate too.) |
 | **D11** | Two doors. **Engineer door = assert-first** (you write, the kernel finds the holes). **Non-technical door = elicit-first** (the kernel asks, you answer). Same slots, same seal-check; only the direction of information flow differs. |
@@ -81,6 +81,8 @@ L2 and L3 exist and work. This repository is the missing front half.
 | **D23** | The real risk to D22 is not agents originating work — it is somebody adding a convenience endpoint to L2. **The ledger must accept contracts from exactly one source, and an anti-entropy test in `agent-ticket-system` must say so.** Not this repository's slice, but do not lose it. |
 | **D24** | Model use is an **optional application concern behind `ModelPort`**. The kernel never knows a provider, model name, protocol, or availability state. A hobby deployment may use a local runtime; an enterprise deployment replaces only the adapter. |
 | **D25** | A model returns candidate values for Rule-owned gaps, never a seal verdict. The application matches each candidate to an offered gap, checks entitlement and named authorship, applies it in isolation, then reruns deterministic seal-check. Malformed, unavailable, or out-of-scope model output is refused. |
+| **D26** | **A requester is never asked to produce a value from nothing.** Every open slot is either *derived* — one correct value follows from what is already declared, so nobody is asked — or *drafted* by the model with the reason it rests on, for a person to confirm or correct. A draft is held beside the document until confirmed; confirmation is deterministic and must name each slot it accepts. Machine-authored is not machine-approved. |
+| **D27** | **`risk`, `irreversibility`, and `authority` are marked `consequence: authority` and can never be `machine_derives`.** They decide how much damage an agent may do unsupervised. A machine that fills them silently has granted itself the permission, and seal-check passes it because the field has a value (D14). The UI renders them apart and unticked; the kernel refuses a blanket confirmation. |
 
 ## Known gaps, and what happens to each
 
@@ -353,6 +355,37 @@ cover several gaps so local hardware does not pay one inference per slot.
 Rule-derived questions, an entitled answer reaches the deterministic sealed
 state through the same kernel functions, and an unavailable model leaves the
 draft unsealed with a clear error.
+
+---
+
+### S11 · Machine drafts, human confirms — **DONE**
+
+`branch: s11-machine-drafts-human-confirms`
+
+One rule covered twelve required slots behind one wording, so the interview
+asked the same generic question repeatedly and a requester could not tell which
+gap it meant. Worse, several of those slots held values no requester could ever
+produce — an identifier, a content sha, a repository name — while the translator
+was correctly forbidden from inventing them. The conversation could not end.
+
+- Each required slot is its own rule: its own question, entitlement, value
+  schema, and declaration of who may originate its value.
+- Rules carry a tier. Relational rules do not run until every structural rule
+  admits the document, so one missing slot cannot cascade into questions about
+  relationships that do not exist yet.
+- `kernel/derivations.ts` fills the slots with exactly one correct value. They
+  are withheld from the translator: a guess can only be wrong.
+- The model returns `answers` (facts the human stated) and `proposals` (its own
+  drafts, each with a reason). Proposals are validated against the rule that
+  reported the gap and held in conversation state, never in the draft.
+- `confirmProposals` turns named drafts into answers deterministically. No model
+  inference, no blanket accept.
+- Each gap carries its own value schema, so the translator no longer receives a
+  whole-document schema and has to locate the right fragment.
+
+**Done when**: a requester describes intent in prose, sees what the machine
+drafted and why, corrects what is wrong, confirms the rest, and reaches the
+deterministic sealed state without ever being asked to invent a slot value.
 
 ---
 

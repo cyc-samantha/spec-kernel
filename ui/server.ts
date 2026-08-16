@@ -7,7 +7,7 @@ import { assessDraft } from '../kernel/draft.ts';
 import { advanceInterview, type InterviewAttempt } from '../kernel/interview.ts';
 import type { ModelPort } from '../ports/model.ts';
 import { loadProjectDeclaration, type ProjectDeclaration } from '../ports/project.ts';
-import { converse, type ConversationState } from './conversation.ts';
+import { confirmProposals, converse, type ConversationState } from './conversation.ts';
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const PUBLIC = new URL('./public/', import.meta.url);
@@ -204,6 +204,7 @@ function conversationRoutes(options: UiServerOptions): (
         messages: [],
         attempts: [],
         answers: [],
+        proposals: [],
       };
       const first = advanceInterview(state.draft, project);
       const introduction = 'Describe the change or investigation you want an Agent team to carry out. I will identify what is clear and ask only for gaps that block the specification.';
@@ -245,6 +246,20 @@ function conversationRoutes(options: UiServerOptions): (
       } finally {
         session.busy = false;
       }
+      return true;
+    }
+
+    if (request.method === 'POST' && pathname === '/api/conversation/confirm') {
+      const body = record(await parsedBody(request, response));
+      const session = typeof body?.['sessionId'] === 'string' ? sessions.get(body['sessionId']) : undefined;
+      const slots = body?.['slots'];
+      if (!session || !Array.isArray(slots) || !slots.every((slot) => typeof slot === 'string')) {
+        if (!response.headersSent) json(response, 422, { error: 'invalid_request' });
+        return true;
+      }
+      const result = confirmProposals(session.state, project, identity, slots);
+      session.state = result.state;
+      json(response, 200, { ...result, runtime: configured.label });
       return true;
     }
     return false;

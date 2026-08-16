@@ -20,13 +20,13 @@ describe('a complete specification', () => {
   });
 });
 
-describe('the seven v1 rules', () => {
+describe('the v1 rules', () => {
   const scenarios: {
     ruleId: string;
     mutate(specification: MutableSpecification): void;
   }[] = [
     {
-      ruleId: 'required-slots',
+      ruleId: 'title-stated',
       mutate: (specification) => {
         specification.title = '   ';
       },
@@ -81,46 +81,70 @@ describe('the seven v1 rules', () => {
     expect(ruleIdsFor(specification)).toEqual([ruleId]);
   });
 
-  it('keeps each check, question, and entitlement in one rule object', () => {
-    expect(rules).toHaveLength(8);
+  it('keeps each check, question, entitlement, and authorship in one rule object', () => {
+    expect(rules).toHaveLength(19);
     for (const rule of rules) {
       expect(rule.question.trim()).not.toBe('');
       expect(rule.entitlement).toMatch(/^(requester|technical_author)$/);
+      expect(rule.authorship).toMatch(/^(machine_derives|human_confirms)$/);
+      expect(rule.consequence).toMatch(/^(routine|authority)$/);
+      expect(rule.tier).toMatch(/^(structural|relational)$/);
+      expect(rule.valueSchema).toBeDefined();
       expect(typeof rule.check).toBe('function');
+    }
+  });
+
+  /*
+   * These three slots decide how much damage an agent may do unsupervised.
+   * A machine may draft them; only a named person may turn a draft into the
+   * grant itself (D14, D22).
+   */
+  it('never lets a machine originate an authority grant', () => {
+    const consequential = rules.filter((rule) => rule.consequence === 'authority');
+    expect(consequential.map((rule) => rule.slot).sort())
+      .toEqual(['authority', 'irreversibility', 'risk']);
+    for (const rule of consequential) {
+      expect(rule.authorship).toBe('human_confirms');
     }
   });
 });
 
 describe('required slots', () => {
-  const topLevelSlots = [
-    'intent',
-    'id',
-    'title',
-    'target',
-    'scope',
-    'constraints',
-    'acceptance',
-    'context',
-    'authority',
-    'irreversibility',
-    'risk',
-    'dependsOn',
+  const slotRules = [
+    ['intent', 'intent-declared'],
+    ['id', 'specification-identified'],
+    ['title', 'title-stated'],
+    ['target', 'target-named'],
+    ['scope', 'scope-bounded'],
+    ['constraints', 'constraints-declared'],
+    ['acceptance', 'acceptance-stated'],
+    ['context', 'context-declared'],
+    ['authority', 'authority-granted'],
+    ['irreversibility', 'irreversibility-classified'],
+    ['risk', 'risk-classified'],
+    ['dependsOn', 'dependencies-declared'],
   ] as const;
 
-  it.each(topLevelSlots)('reports the required-slots rule when %s is absent', (slot) => {
+  it.each(slotRules)('reports only %s own rule when it is absent', (slot, ruleId) => {
     const specification = validSpecification() as MutableSpecification;
     delete specification[slot];
-    expect(ruleIdsFor(specification)).toEqual(['required-slots']);
+    expect(ruleIdsFor(specification)).toEqual([ruleId]);
   });
 
-  it('reports nested blank strings by their slot', () => {
+  /*
+   * The gap is reported against the whole slot so one proposed value can fill
+   * it in a single piece; the path inside the slot enriches the message.
+   */
+  it('reports a nested blank string against the slot that owns it', () => {
     const specification = validSpecification();
     specification.context[0]!.why = '  ';
-    expect(sealCheck(specification)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ ruleId: 'required-slots', slot: 'context.0.why' }),
-      ]),
-    );
+    expect(sealCheck(specification)).toEqual([
+      expect.objectContaining({
+        ruleId: 'context-declared',
+        slot: 'context',
+        message: expect.stringContaining('0.why'),
+      }),
+    ]);
   });
 });
 
@@ -190,15 +214,15 @@ describe('blocking decisions', () => {
     specification['blockingDecisions'] = [
       { id: 'BD-01', question: 'Which format?', owner: 'owner@example.test', deferred: false },
     ];
-    expect(ruleIdsFor(specification)).toEqual(['required-slots']);
+    expect(ruleIdsFor(specification)).toEqual(['blocking-decisions-declared']);
   });
 });
 
 describe('fail-closed behaviour', () => {
   it('refuses malformed input instead of treating it as an empty missing list', () => {
-    expect(sealCheck(null)).toEqual([
-      expect.objectContaining({ ruleId: 'required-slots', slot: '(root)' }),
-    ]);
+    const missing = sealCheck(null);
+    expect(missing).not.toEqual([]);
+    expect(missing.every((item) => item.entitlement !== undefined)).toBe(true);
   });
 
   it('refuses input that cannot be evaluated', () => {

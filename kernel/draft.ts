@@ -3,7 +3,8 @@ import { specificationSchema, type Specification } from './specification.ts';
 
 export type DraftAssessment =
   | { status: 'sealed'; specification: Specification; missing: readonly [] }
-  | { status: 'incomplete'; draft: unknown; missing: readonly MissingItem[] };
+  | { status: 'incomplete'; draft: unknown; missing: readonly MissingItem[] }
+  | { status: 'refused'; draft: unknown; reason: string };
 
 /** Checks an asserted draft as written; this path asks nothing and supplies nothing. */
 export function assessDraft(draft: unknown): DraftAssessment {
@@ -12,18 +13,13 @@ export function assessDraft(draft: unknown): DraftAssessment {
 
   const parsed = specificationSchema.safeParse(draft);
   if (!parsed.success) {
-    // SAFETY: seal-check and the slot schema must agree. Refuse if a future edit
-    // makes them diverge rather than returning an unchecked document as sealed.
+    // SAFETY: the rules and the document schema must agree. A divergence is not
+    // a gap any question can fill — no rule owns it — so it refuses rather than
+    // inventing a slot or returning an unchecked document as sealed.
     return {
-      status: 'incomplete',
+      status: 'refused',
       draft,
-      missing: [{
-        ruleId: 'required-slots',
-        slot: '(root)',
-        question: 'What value belongs in each missing required specification slot?',
-        entitlement: 'requester',
-        message: 'the draft passed its rules but not the specification schema',
-      }],
+      reason: 'the draft passed every rule but not the specification schema',
     };
   }
   return { status: 'sealed', specification: parsed.data, missing: [] };

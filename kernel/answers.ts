@@ -7,6 +7,7 @@ export interface SlotAnswer {
   value: unknown;
   answeredBy: string;
   entitlement: Entitlement;
+  source: 'human' | 'derived';
 }
 
 export interface AnswerInput {
@@ -77,9 +78,26 @@ export function recordAnswer(
         value: input.value,
         answeredBy: input.answeredBy,
         entitlement: missing.entitlement,
+        source: 'human',
       },
     ],
   };
+}
+
+/*
+ * A derived value has no human author and claims none. Routing it through
+ * entitlement would be a lie: nobody decided it, so nobody can be asked to
+ * stand behind it.
+ */
+export function recordDerivation(
+  history: readonly SlotAnswer[],
+  missing: Pick<MissingItem, 'slot' | 'entitlement'>,
+  value: unknown,
+): readonly SlotAnswer[] {
+  return [
+    ...history,
+    { slot: missing.slot, value, answeredBy: 'derivation', entitlement: missing.entitlement, source: 'derived' },
+  ];
 }
 
 export type InterviewState =

@@ -15,4 +15,4 @@ description: Elicit only the human answers that deterministic seal-check rules r
 5. Record the answer and `answeredBy` only when the project declaration entitles that identity. Keep requester answers append-only.
 6. Update only the answered slot, rerun the controller, and stop at `sealed`, `awaiting_technical_completion`, `blocking_decision`, or `refused`.
 
-Never answer a question yourself. Suggestions remain `provenance: proposed` and cannot seal. If the controller repeats a gap after a response, say exactly: “That did not answer the question I asked.” A terminal `awaiting_technical_completion` is successful, not an interview failure.
+Never answer a question yourself. A value you supply is a proposal: it is held beside the draft, carries the reason it rests on, and becomes an answer only when an entitled person names the slot they accept. Slots marked `consequence: authority` need that confirmation one at a time. If the controller repeats a gap after a response, say exactly: “That did not answer the question I asked.” A terminal `awaiting_technical_completion` is successful, not an interview failure.

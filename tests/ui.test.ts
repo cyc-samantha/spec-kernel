@@ -77,11 +77,11 @@ describe('Conversational UI API', () => {
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toEqual(expect.objectContaining({
       status: 'ask',
-      missing: expect.objectContaining({ ruleId: 'required-slots' }),
-      prompt: 'What value belongs in each missing required specification slot?',
+      missing: expect.objectContaining({ ruleId: 'intent-declared' }),
+      prompt: 'Is this a change to the system, or a spike that produces knowledge?',
       state: expect.objectContaining({
         messages: [expect.objectContaining({
-          content: expect.stringContaining('What value belongs in each missing required specification slot?'),
+          content: expect.stringContaining('Is this a change to the system, or a spike that produces knowledge?'),
         })],
       }),
     }));
@@ -133,6 +133,43 @@ describe('Conversational UI API', () => {
     expect(complete).not.toHaveBeenCalled();
   });
 
+  it('confirms named drafts over the same session without a second inference', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const complete = vi.fn().mockResolvedValue({
+      assistantMessage: 'I drafted the open-decision state.',
+      answers: [],
+      proposals: [{
+        ruleId: 'blocking-decisions-declared',
+        slot: 'blockingDecisions',
+        value: [],
+        reason: 'you said nothing else is blocked',
+      }],
+    });
+    await bind({ model: { complete } as ModelPort, initialDraft: draft });
+
+    const started = await post('/api/conversation/start', {});
+    const { sessionId } = await started.json() as { sessionId: string };
+    const asked = await post('/api/conversation/turn', { sessionId, message: 'Nothing else is blocked.' });
+    await expect(asked.json()).resolves.toEqual(expect.objectContaining({
+      status: 'ask',
+      state: expect.objectContaining({
+        proposals: [expect.objectContaining({ slot: 'blockingDecisions' })],
+      }),
+    }));
+
+    const confirmed = await post('/api/conversation/confirm', { sessionId, slots: ['blockingDecisions'] });
+    expect(confirmed.status).toBe(200);
+    await expect(confirmed.json()).resolves.toEqual(expect.objectContaining({ status: 'sealed' }));
+    expect(complete).toHaveBeenCalledOnce();
+  });
+
+  it('refuses a confirmation for a session it does not hold', async () => {
+    const response = await post('/api/conversation/confirm', { sessionId: 'absent', slots: ['risk'] });
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({ error: 'invalid_request' });
+  });
+
   it('reports an unavailable model without changing the server-side draft', async () => {
     const model: ModelPort = { complete: async () => { throw new Error('offline'); } };
     await bind({ model });
@@ -146,7 +183,7 @@ describe('Conversational UI API', () => {
     await expect(response.json()).resolves.toEqual(expect.objectContaining({
       status: 'refused',
       reason: 'the configured model is unavailable',
-      state: expect.objectContaining({ draft: {} }),
+      state: expect.objectContaining({ answers: [expect.objectContaining({ source: 'derived' })] }),
     }));
   });
 });
