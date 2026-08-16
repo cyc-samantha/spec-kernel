@@ -7,6 +7,12 @@ function request(): ModelRequest {
   return {
     messages: [{ role: 'user', content: 'There are no blocking decisions.' }],
     draft: { title: 'Example' },
+    proposals: [{
+      ruleId: 'constraints-declared',
+      slot: 'constraints',
+      value: [],
+      reason: 'the requester named no constraints',
+    }],
     missing: [{
       ruleId: 'blocking-decisions-declared',
       slot: 'blockingDecisions',
@@ -68,6 +74,8 @@ describe('Ollama model adapter', () => {
     }));
     expect(JSON.stringify(body)).toContain('blocking-decisions-declared');
     expect(JSON.stringify(body)).toContain('blockingDecisions');
+    expect(JSON.stringify(body)).toContain('pendingProposals');
+    expect(JSON.stringify(body)).toContain('the requester named no constraints');
     expect(JSON.stringify(body)).toContain('Never move a draft into answers yourself');
     expect(JSON.stringify(body)).toContain('Never claim that a specification is complete or sealed');
   });

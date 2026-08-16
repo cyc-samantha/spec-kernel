@@ -213,6 +213,50 @@ describe('conversational specification intake', () => {
     ]);
   });
 
+  it('carries pending proposals into the next model turn and does not erase them', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['constraints'];
+    delete draft['blockingDecisions'];
+    const seen: unknown[] = [];
+    const model: ModelPort = {
+      complete: async (request) => {
+        seen.push(request.proposals);
+        if (seen.length === 1) {
+          return {
+            assistantMessage: 'I drafted the remaining constraints.',
+            answers: [],
+            proposals: [{
+              ruleId: 'constraints-declared',
+              slot: 'constraints',
+              value: [],
+              reason: 'you named no constraints',
+            }],
+          };
+        }
+        return {
+          assistantMessage: 'I recorded that no decisions remain.',
+          answers: [{
+            ruleId: 'blocking-decisions-declared',
+            slot: 'blockingDecisions',
+            value: [],
+          }],
+          proposals: [],
+        };
+      },
+    };
+
+    const first = await converse(state(draft), project(), 'local-user', 'Use the existing defaults.', model);
+    const second = await converse(first.state, project(), 'local-user', 'There are no blocking decisions.', model);
+
+    expect(seen[0]).toEqual([]);
+    expect(seen[1]).toEqual([
+      expect.objectContaining({ slot: 'constraints', value: [] }),
+    ]);
+    expect(second.state.proposals).toEqual([
+      expect.objectContaining({ slot: 'constraints', value: [] }),
+    ]);
+  });
+
   /*
    * A rebuke for a gap the machine just answered for itself is the interview
    * arguing with its own draft. The requester sees a value on offer and a

@@ -20,6 +20,15 @@ export interface ModelRequest {
   messages: readonly ConversationMessage[];
   draft: unknown;
   missing: readonly MissingItem[];
+  proposals: readonly PendingProposal[];
+}
+
+/** Machine drafts already shown to the requester but not yet confirmed. */
+export interface PendingProposal {
+  ruleId: string;
+  slot: string;
+  value: unknown;
+  reason: string;
 }
 
 /**

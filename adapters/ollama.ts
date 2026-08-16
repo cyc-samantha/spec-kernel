@@ -201,7 +201,14 @@ export class OllamaAdapter implements ModelPort, SplitPort {
     return this.#ask(proposalFormat, [
       { role: 'system', content: systemPrompt },
       ...request.messages,
-      { role: 'system', content: JSON.stringify({ currentDraft: request.draft, gaps: request.missing }) },
+      {
+        role: 'system',
+        content: JSON.stringify({
+          currentDraft: request.draft,
+          pendingProposals: request.proposals,
+          gaps: request.missing,
+        }),
+      },
     ]);
   }
 
