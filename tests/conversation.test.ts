@@ -586,7 +586,12 @@ describe('conversational specification intake', () => {
     ]);
   });
 
-  it('downgrades a model correction to a pending answer back into a proposal', async () => {
+  /*
+   * A live 2b run answered this exact turn correctly and the application threw
+   * the answer away, keeping instead the model's own reconciliation of it — which
+   * had moved three of the four stated mappings into exclude.
+   */
+  it('records what the human stated for a slot a machine had already drafted', async () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['scope'];
     const carried: ConversationState = {
@@ -617,14 +622,13 @@ describe('conversational specification intake', () => {
       }),
     );
 
-    expect(corrected.state.draft).not.toEqual(expect.objectContaining({ scope: expect.anything() }));
-    expect(corrected.state.answers).toEqual([]);
-    expect(corrected.state.proposals).toEqual([
-      expect.objectContaining({
-        slot: 'scope',
-        value: { include: ['first name -> surname', 'date of birth -> DOB'], exclude: [] },
-      }),
+    expect(corrected.state.draft).toEqual(expect.objectContaining({
+      scope: { include: ['first name -> surname', 'date of birth -> DOB'], exclude: [] },
+    }));
+    expect(corrected.state.answers).toEqual([
+      expect.objectContaining({ slot: 'scope', source: 'human', answeredBy: 'local-user' }),
     ]);
+    expect(corrected.state.proposals).toEqual([]);
     expect(corrected.state.attempts.at(-1)?.yieldedNewInformation).toBe(true);
   });
 

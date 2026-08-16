@@ -353,17 +353,19 @@ function sameProposal(left: SlotProposal | undefined, right: SlotProposal): bool
     && JSON.stringify(left.value) === JSON.stringify(right.value);
 }
 
-function redirectedPendingAnswers(
+/*
+ * An answer identical to a standing draft is the model rubber-stamping itself,
+ * and only a person may accept a draft (D8). A different value is content the
+ * human supplied, and what a human states outranks what a machine drafted for
+ * the same slot — discarding it leaves the machine's guess in its place.
+ */
+function humanSuppliedAnswers(
   pending: ReadonlyMap<string, SlotProposal>,
   answers: readonly { ruleId: string; slot: string; value: unknown }[],
-): readonly { ruleId: string; slot: string; value: unknown; reason: string }[] {
-  return answers.flatMap((answer) => {
-    const previous = pending.get(gapKey(answer));
-    if (!previous || JSON.stringify(previous.value) === JSON.stringify(answer.value)) return [];
-    return [{
-      ...answer,
-      reason: 'the latest human message supplied a correction to this pending draft',
-    }];
+): readonly { ruleId: string; slot: string; value: unknown }[] {
+  return answers.filter((answer) => {
+    const drafted = pending.get(gapKey(answer));
+    return !drafted || JSON.stringify(drafted.value) !== JSON.stringify(answer.value);
   });
 }
 
@@ -446,17 +448,12 @@ export async function converse(
   // deterministic confirmation route below. Letting the translator copy it
   // into answers would allow the model to approve its own proposal.
   const pending = new Map(current.proposals.map((proposal) => [gapKey(proposal), proposal]));
-  const directAnswers = loaded.proposal.answers.filter((answer) => !pending.has(gapKey(answer)));
-  const redirected = redirectedPendingAnswers(pending, loaded.proposal.answers);
-  const applied = applyModelAnswers(current, presented, directAnswers, identity, project);
+  const supplied = humanSuppliedAnswers(pending, loaded.proposal.answers);
+  const applied = applyModelAnswers(current, presented, supplied, identity, project);
   current = withDerivations(applied, project);
   current = {
     ...current,
-    proposals: mergeUsableProposals(
-      current,
-      state.proposals,
-      [...redirected, ...loaded.proposal.proposals],
-    ),
+    proposals: mergeUsableProposals(current, state.proposals, loaded.proposal.proposals),
   };
   current = withAttempt(
     current,
