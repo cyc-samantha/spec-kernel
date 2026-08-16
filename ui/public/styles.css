@@ -119,10 +119,7 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 20px
 }
 
 .proposal {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.6rem;
-  align-items: start;
+  display: block;
   padding: 0.5rem 0.6rem;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.03);
@@ -141,13 +138,11 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 20px
 }
 
 .proposal-value {
-  box-sizing: border-box;
-  width: 100%;
-  resize: vertical;
-  border: 1px solid var(--line, #d8d8d8);
-  border-radius: 6px;
+  margin: 0.35rem 0 0;
   padding: 0.45rem 0.55rem;
+  border-radius: 6px;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
   background: var(--surface, #fff);
   color: inherit;
 }

@@ -11,7 +11,6 @@ const draftOutput = document.querySelector('#draft-output');
 const errorCard = document.querySelector('#error-card');
 const proposalCard = document.querySelector('#proposal-card');
 const proposalList = document.querySelector('#proposal-list');
-const confirmButton = document.querySelector('#confirm-proposals');
 const downloadButton = document.querySelector('#download-spec');
 const ticketCard = document.querySelector('#ticket-card');
 const ticketList = document.querySelector('#ticket-list');
@@ -27,47 +26,29 @@ let tickets = [];
 function setBusy(busy) {
   intentInput.disabled = busy || terminal;
   sendButton.disabled = busy || terminal;
-  confirmButton.disabled = busy || terminal;
   sendButton.textContent = busy ? 'Thinking…' : 'Send';
 }
 
+// WHY: this card reports, it does not ask. Accepting a draft is something the
+// requester says in the conversation, so there is one way into the document.
 function proposalRow(proposal) {
   const row = document.createElement('li');
   row.className = proposal.consequence === 'authority' ? 'proposal authority' : 'proposal';
-  const box = document.createElement('input');
-  box.type = 'checkbox';
-  box.value = proposal.slot;
-  // WHY: a grant of authority nobody read is a grant the machine made itself.
-  box.checked = proposal.consequence !== 'authority';
-  const label = document.createElement('div');
   const slot = document.createElement('strong');
   slot.textContent = proposal.slot;
-  const value = document.createElement('textarea');
+  const value = document.createElement('pre');
   value.className = 'proposal-value';
-  value.rows = 4;
-  value.spellcheck = false;
-  value.value = JSON.stringify(proposal.value, null, 2);
-  value.setAttribute('aria-label', `Edit ${proposal.slot} JSON value`);
+  value.textContent = JSON.stringify(proposal.value, null, 2);
   const reason = document.createElement('p');
   reason.className = 'proposal-reason';
   reason.textContent = proposal.reason;
-  label.append(slot, value, reason);
-  row.append(box, label);
+  row.append(slot, value, reason);
   return row;
 }
 
 function renderProposals(proposals = []) {
   proposalCard.hidden = proposals.length === 0;
   proposalList.replaceChildren(...proposals.map(proposalRow));
-}
-
-function checkedProposals() {
-  return [...proposalList.querySelectorAll('.proposal')].flatMap((row) => {
-    const box = row.querySelector('input:checked');
-    if (!box) return [];
-    const editor = row.querySelector('.proposal-value');
-    return [{ slot: box.value, value: JSON.parse(editor.value) }];
-  });
 }
 
 function showError(message) {
@@ -194,21 +175,6 @@ async function sendMessage() {
   }
 }
 
-async function confirmSelected() {
-  if (!sessionId) return;
-  setBusy(true);
-  clearError();
-  try {
-    const proposals = checkedProposals();
-    if (!proposals.length) return;
-    render(await post('/api/conversation/confirm', { sessionId, proposals }));
-  } catch (error) {
-    showError(`The confirmation could not be recorded. Check the edited JSON values: ${error.message}`);
-  } finally {
-    setBusy(false);
-  }
-}
-
 function ticketRow(contract) {
   const row = document.createElement('li');
   row.className = 'proposal';
@@ -258,7 +224,6 @@ downloadTickets.addEventListener('click', () => {
   link.click();
   URL.revokeObjectURL(link.href);
 });
-confirmButton.addEventListener('click', confirmSelected);
 composer.addEventListener('submit', (event) => {
   event.preventDefault();
   sendMessage();

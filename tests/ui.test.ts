@@ -133,7 +133,7 @@ describe('Conversational UI API', () => {
     expect(complete).not.toHaveBeenCalled();
   });
 
-  it('confirms named drafts over the same session without a second inference', async () => {
+  it('accepts a draft the requester agrees to in the chat, without a second inference', async () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['blockingDecisions'];
     const complete = vi.fn().mockResolvedValue({
@@ -158,48 +158,20 @@ describe('Conversational UI API', () => {
       }),
     }));
 
-    const confirmed = await post('/api/conversation/confirm', { sessionId, slots: ['blockingDecisions'] });
+    const confirmed = await post('/api/conversation/turn', { sessionId, message: 'yes' });
     expect(confirmed.status).toBe(200);
     await expect(confirmed.json()).resolves.toEqual(expect.objectContaining({ status: 'sealed' }));
     expect(complete).toHaveBeenCalledOnce();
   });
 
-  it('validates a human-edited proposal before confirming it', async () => {
-    const draft = validSpecification() as unknown as Record<string, unknown>;
-    delete draft['scope'];
-    const complete = vi.fn().mockResolvedValue({
-      answers: [],
-      proposals: [{
-        ruleId: 'scope-bounded',
-        slot: 'scope',
-        value: { include: ['mapping logic'], exclude: [] },
-        reason: 'the requester described mapping logic',
-      }],
-    });
-    await bind({ model: { complete } as ModelPort, initialDraft: draft });
-
-    const started = await post('/api/conversation/start', {});
-    const { sessionId } = await started.json() as { sessionId: string };
-    await post('/api/conversation/turn', { sessionId, message: 'Build a mapping tool.' });
-    const mappings = {
-      include: ['first name -> surname', 'last name -> forename'],
-      exclude: [],
-    };
-    const confirmed = await post('/api/conversation/confirm', {
-      sessionId,
-      proposals: [{ slot: 'scope', value: mappings }],
-    });
-
-    await expect(confirmed.json()).resolves.toEqual(expect.objectContaining({
-      status: 'sealed',
-      state: expect.objectContaining({ draft: expect.objectContaining({ scope: mappings }) }),
-    }));
-  });
-
-  it('refuses a confirmation for a session it does not hold', async () => {
+  /*
+   * The document has one entrance. A route that wrote a confirmed value without
+   * a conversation turn would be a second one, unreachable from the interview
+   * and unaccountable to it.
+   */
+  it('offers no route that records a value outside a conversation turn', async () => {
     const response = await post('/api/conversation/confirm', { sessionId: 'absent', slots: ['risk'] });
-    expect(response.status).toBe(422);
-    await expect(response.json()).resolves.toEqual({ error: 'invalid_request' });
+    expect(response.status).toBe(404);
   });
 
   it('reports an unavailable model without changing the server-side draft', async () => {
@@ -294,11 +266,15 @@ describe('checked-in UI source', () => {
     expect(html).not.toMatch(/https?:\/\//);
   });
 
-  it('lets a person edit drafted JSON before the confirmation request', () => {
+  /* The drafts card reports; it is not a second way to answer the interview. */
+  it('shows drafts without offering any control that records one', () => {
     const script = readFileSync(new URL('../ui/public/app.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../ui/public/index.html', import.meta.url), 'utf8');
     expect(script).toContain("value.className = 'proposal-value'");
-    expect(script).toContain('JSON.parse(editor.value)');
-    expect(script).toContain("{ sessionId, proposals }");
+    expect(script).not.toContain('checkbox');
+    expect(script).toContain("post('/api/conversation/turn'");
+    expect(script).not.toContain("post('/api/conversation/confirm'");
+    expect(html).not.toContain('confirm-proposals');
   });
 });
 

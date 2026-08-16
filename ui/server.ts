@@ -7,7 +7,7 @@ import { assessDraft } from '../kernel/draft.ts';
 import { advanceInterview, type InterviewAttempt } from '../kernel/interview.ts';
 import type { ModelPort, SplitPort } from '../ports/model.ts';
 import { loadProjectDeclaration, type ProjectDeclaration } from '../ports/project.ts';
-import { confirmProposalValues, confirmProposals, converse, type ConversationState } from './conversation.ts';
+import { converse, type ConversationState } from './conversation.ts';
 import { proposeSplit } from './split-review.ts';
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -249,36 +249,6 @@ function conversationRoutes(options: UiServerOptions): (
       } finally {
         session.busy = false;
       }
-      return true;
-    }
-
-    if (request.method === 'POST' && pathname === '/api/conversation/confirm') {
-      const body = record(await parsedBody(request, response));
-      const session = typeof body?.['sessionId'] === 'string' ? sessions.get(body['sessionId']) : undefined;
-      const slots = body?.['slots'];
-      const proposals = body?.['proposals'];
-      const validSlots = Array.isArray(slots) && slots.every((slot) => typeof slot === 'string');
-      const validProposals = Array.isArray(proposals) && proposals.every((proposal) => {
-        const item = record(proposal);
-        return item && typeof item['slot'] === 'string' && Object.hasOwn(item, 'value');
-      });
-      if (!session || (!validSlots && !validProposals)) {
-        if (!response.headersSent) json(response, 422, { error: 'invalid_request' });
-        return true;
-      }
-      const result = validProposals
-        ? confirmProposalValues(
-            session.state,
-            project,
-            identity,
-            (proposals as Record<string, unknown>[]).map((proposal) => ({
-              slot: proposal['slot'] as string,
-              value: proposal['value'],
-            })),
-          )
-        : confirmProposals(session.state, project, identity, slots as string[]);
-      session.state = result.state;
-      json(response, 200, { ...result, runtime: configured.label });
       return true;
     }
 
