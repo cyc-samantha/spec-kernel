@@ -391,7 +391,12 @@ export async function converse(
     return { status: 'refused', state: current, reason: 'the model proposed an answer outside the offered Rule gaps' };
   }
 
-  const applied = applyModelAnswers(current, offered, loaded.proposal.answers, identity, project);
+  // A standing machine draft can become an answer only through the named,
+  // deterministic confirmation route below. Letting the translator copy it
+  // into answers would allow the model to approve its own proposal.
+  const pending = new Set(current.proposals.map(gapKey));
+  const directAnswers = loaded.proposal.answers.filter((answer) => !pending.has(gapKey(answer)));
+  const applied = applyModelAnswers(current, offered, directAnswers, identity, project);
   current = withDerivations(applied, project);
   current = {
     ...current,

@@ -91,6 +91,7 @@ describe('Ollama model adapter', () => {
     expect(JSON.stringify(body)).toContain('Never claim that a specification is complete or sealed');
     expect(JSON.stringify(body)).toContain('Do not fill unrelated gaps with generic defaults');
     expect(JSON.stringify(body)).toContain('Missing information is not an explicit empty list');
+    expect(JSON.stringify(body)).toContain('Never copy a pendingProposals slot into answers');
     expect(JSON.stringify(body['format'])).not.toContain('assistantMessage');
   });
 

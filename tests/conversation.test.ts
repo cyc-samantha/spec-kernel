@@ -507,6 +507,47 @@ describe('conversational specification intake', () => {
     expect(confirmed.state.proposals).toEqual([]);
   });
 
+  it('does not let the model confirm its own pending proposal', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const proposed = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'Nothing else is blocked.',
+      responses({
+        answers: [],
+        proposals: [{
+          ruleId: 'blocking-decisions-declared',
+          slot: 'blockingDecisions',
+          value: [],
+          reason: 'you said nothing else is blocked',
+        }],
+      }),
+    );
+
+    const copied = await converse(
+      proposed.state,
+      project(),
+      'local-user',
+      'Use the value above.',
+      responses({
+        answers: [{
+          ruleId: 'blocking-decisions-declared',
+          slot: 'blockingDecisions',
+          value: [],
+        }],
+        proposals: [],
+      }),
+    );
+
+    expect(copied.state.draft).not.toEqual(expect.objectContaining({ blockingDecisions: [] }));
+    expect(copied.state.answers).toEqual([]);
+    expect(copied.state.proposals).toEqual([
+      expect.objectContaining({ slot: 'blockingDecisions', value: [] }),
+    ]);
+  });
+
   it('refuses a confirmation that names no drafted slot', () => {
     const result = confirmProposals(state({}), project(), 'local-user', []);
     expect(result).toEqual(expect.objectContaining({

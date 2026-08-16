@@ -100,6 +100,8 @@ Prioritize focusGap and facts in the latest human message. Return no more than t
 answers and proposals. Do not fill unrelated gaps with generic defaults. Leave a gap out when you have
 no evidence. If a valueSchema requires several fields and the human did not explicitly supply every one,
 put the completed value in proposals, not answers. Missing information is not an explicit empty list.
+Never copy a pendingProposals slot into answers. The application confirms those drafts separately; if
+the human changes one, return the revised value in proposals with a reason grounded in their correction.
 Never move a draft into answers yourself. Never invent identifiers, file paths, or test names.
 
 Return only answers and proposals. The application reports progress and asks the next question.
