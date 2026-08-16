@@ -1,5 +1,6 @@
 import { parentIntentFrom, validateSplitProposal, type ProposedContract } from '../kernel/split.ts';
-import { ModelPortError, type SplitPort } from '../ports/model.ts';
+import type { SplitPort } from '../ports/model.ts';
+import { modelRefusalReason } from './model-refusal.ts';
 
 export type SplitReview =
   | { status: 'split'; because: string; contracts: readonly ProposedContract[] }
@@ -8,14 +9,6 @@ export type SplitReview =
 
 function refused(reason: string, problems: readonly string[] = []): SplitReview {
   return { status: 'refused', reason, problems };
-}
-
-function refusalReason(error: unknown): string {
-  if (!(error instanceof ModelPortError)) return 'the configured model is unavailable';
-  if (error.failure === 'invalid_response') return 'the configured model returned an invalid response';
-  if (error.failure === 'timed_out') return 'the configured model request timed out';
-  if (error.failure === 'context_exceeded') return 'the sealed intent outgrew the configured model context window';
-  return 'the configured model is unavailable';
 }
 
 /**
@@ -36,7 +29,7 @@ export async function proposeSplit(
   try {
     raw = await model.splitIntent({ intent: parent.intent });
   } catch (error) {
-    return refused(refusalReason(error));
+    return refused(modelRefusalReason(error, 'sealed intent'));
   }
 
   const validated = validateSplitProposal(parent.intent, raw);
