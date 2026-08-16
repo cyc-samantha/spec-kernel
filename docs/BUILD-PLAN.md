@@ -292,7 +292,7 @@ being good.**
 
 ---
 
-### S8 · Split, and one contract per repository
+### S8 · Split, and one contract per repository — **DONE**
 
 `branch: s8-split`
 
