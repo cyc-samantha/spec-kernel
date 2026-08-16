@@ -62,9 +62,6 @@ export const modelProposalSchema = z.object({
   answers: z.array(answerSchema).max(2),
   proposals: z.array(draftedValueSchema).max(2).default([]),
 }).strict().superRefine((proposal, context) => {
-  if (proposal.answers.length + proposal.proposals.length > 2) {
-    context.addIssue({ code: 'custom', message: 'a model turn may return at most two slot values' });
-  }
   if (duplicated(proposal.answers)) {
     context.addIssue({ code: 'custom', path: ['answers'], message: 'answers must be unique' });
   }
