@@ -345,6 +345,20 @@ function sameProposal(left: SlotProposal | undefined, right: SlotProposal): bool
     && JSON.stringify(left.value) === JSON.stringify(right.value);
 }
 
+function redirectedPendingAnswers(
+  pending: ReadonlyMap<string, SlotProposal>,
+  answers: readonly { ruleId: string; slot: string; value: unknown }[],
+): readonly { ruleId: string; slot: string; value: unknown; reason: string }[] {
+  return answers.flatMap((answer) => {
+    const previous = pending.get(gapKey(answer));
+    if (!previous || JSON.stringify(previous.value) === JSON.stringify(answer.value)) return [];
+    return [{
+      ...answer,
+      reason: 'the latest human message supplied a correction to this pending draft',
+    }];
+  });
+}
+
 /** The ledger narrates progress; model prose cannot claim writes that did not happen. */
 function progressMessage(
   beforeAnswerCount: number,
@@ -413,13 +427,18 @@ export async function converse(
   // A standing machine draft can become an answer only through the named,
   // deterministic confirmation route below. Letting the translator copy it
   // into answers would allow the model to approve its own proposal.
-  const pending = new Set(current.proposals.map(gapKey));
+  const pending = new Map(current.proposals.map((proposal) => [gapKey(proposal), proposal]));
   const directAnswers = loaded.proposal.answers.filter((answer) => !pending.has(gapKey(answer)));
+  const redirected = redirectedPendingAnswers(pending, loaded.proposal.answers);
   const applied = applyModelAnswers(current, offered, directAnswers, identity, project);
   current = withDerivations(applied, project);
   current = {
     ...current,
-    proposals: mergeUsableProposals(current, state.proposals, loaded.proposal.proposals),
+    proposals: mergeUsableProposals(
+      current,
+      state.proposals,
+      [...redirected, ...loaded.proposal.proposals],
+    ),
   };
   current = withAttempt(current, initialStep.missing, initialStep.prompt, proposalsBefore, beforeAnswerCount);
   const narration = progressMessage(beforeAnswerCount, state.proposals, current);

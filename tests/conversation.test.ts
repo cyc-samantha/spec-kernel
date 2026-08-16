@@ -556,6 +556,48 @@ describe('conversational specification intake', () => {
     ]);
   });
 
+  it('downgrades a model correction to a pending answer back into a proposal', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['scope'];
+    const carried: ConversationState = {
+      ...state(draft),
+      proposals: [{
+        ruleId: 'scope-bounded',
+        slot: 'scope',
+        question: 'What is inside this change, and what is explicitly outside it?',
+        value: { include: ['column mapping logic'], exclude: [] },
+        reason: 'the requester described a mapping tool',
+        consequence: 'routine',
+        entitlement: 'requester',
+      }],
+    };
+
+    const corrected = await converse(
+      carried,
+      project(),
+      'local-user',
+      'scope include first name to surname and date of birth to DOB',
+      responses({
+        answers: [{
+          ruleId: 'scope-bounded',
+          slot: 'scope',
+          value: { include: ['first name -> surname', 'date of birth -> DOB'], exclude: [] },
+        }],
+        proposals: [],
+      }),
+    );
+
+    expect(corrected.state.draft).not.toEqual(expect.objectContaining({ scope: expect.anything() }));
+    expect(corrected.state.answers).toEqual([]);
+    expect(corrected.state.proposals).toEqual([
+      expect.objectContaining({
+        slot: 'scope',
+        value: { include: ['first name -> surname', 'date of birth -> DOB'], exclude: [] },
+      }),
+    ]);
+    expect(corrected.state.attempts.at(-1)?.yieldedNewInformation).toBe(true);
+  });
+
   it('refuses a confirmation that names no drafted slot', () => {
     const result = confirmProposals(state({}), project(), 'local-user', []);
     expect(result).toEqual(expect.objectContaining({
