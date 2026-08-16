@@ -1,7 +1,9 @@
 import { ModelPortError, type ModelPort, type ModelRequest } from '../ports/model.ts';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:11434';
-const DEFAULT_TIMEOUT_MS = 120_000;
+const DEFAULT_TIMEOUT_MS = 300_000;
+const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
+const DEFAULT_KEEP_ALIVE = '10m';
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 
 const proposalFormat = {
@@ -31,6 +33,8 @@ const systemPrompt = `You translate human answers into one structured specificat
 Use only facts stated by the human in the conversation. Never invent an answer.
 The supplied gaps and questions originate in deterministic Rules.
 Return an answers entry only for a gap the human actually answered. Copy its ruleId and slot exactly.
+Use the supplied valueSchema to produce the exact JSON type and shape for each slot.
+You may translate or summarize facts the human stated, but do not invent identifiers, paths, tests, decisions, or policy.
 Put the exact JSON value for that supplied slot in value. Omit unanswered gaps from answers.
 assistantMessage briefly explains what was or was not understood; do not ask another question.
 Never claim that a specification is complete or sealed.`;
@@ -39,6 +43,7 @@ export interface OllamaAdapterOptions {
   model: string;
   baseUrl?: string;
   timeoutMs?: number;
+  maxOutputTokens?: number;
   fetch?: typeof fetch;
 }
 
@@ -75,13 +80,24 @@ export class OllamaAdapter implements ModelPort {
   readonly #endpoint: URL;
   readonly #model: string;
   readonly #timeoutMs: number;
+  readonly #maxOutputTokens: number;
   readonly #fetch: typeof fetch;
 
   constructor(options: OllamaAdapterOptions) {
     if (!options.model.trim()) throw new ModelPortError('unavailable', 'a model name is required');
+    if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1)) {
+      throw new ModelPortError('unavailable', 'the model timeout must be a positive integer');
+    }
+    if (
+      options.maxOutputTokens !== undefined
+      && (!Number.isInteger(options.maxOutputTokens) || options.maxOutputTokens < 1)
+    ) {
+      throw new ModelPortError('unavailable', 'the model output budget must be a positive integer');
+    }
     this.#endpoint = chatEndpoint(options.baseUrl ?? DEFAULT_BASE_URL);
     this.#model = options.model;
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.#maxOutputTokens = options.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
     this.#fetch = options.fetch ?? fetch;
   }
 
@@ -95,8 +111,10 @@ export class OllamaAdapter implements ModelPort {
         body: JSON.stringify({
           model: this.#model,
           stream: false,
+          think: false,
+          keep_alive: DEFAULT_KEEP_ALIVE,
           format: proposalFormat,
-          options: { temperature: 0 },
+          options: { temperature: 0, num_predict: this.#maxOutputTokens },
           messages: [
             { role: 'system', content: systemPrompt },
             ...request.messages,
@@ -105,6 +123,7 @@ export class OllamaAdapter implements ModelPort {
               content: JSON.stringify({
                 currentDraft: request.draft,
                 gaps: request.missing,
+                valueSchema: request.valueSchema,
               }),
             },
           ],
@@ -112,6 +131,9 @@ export class OllamaAdapter implements ModelPort {
       });
     } catch (error) {
       if (error instanceof ModelPortError) throw error;
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ModelPortError('timed_out', 'the model runtime exceeded its deadline');
+      }
       throw new ModelPortError('unavailable', 'the model runtime could not be reached');
     }
 

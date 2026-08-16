@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ModelPort } from '../ports/model.ts';
+import { ModelPortError, type ModelPort } from '../ports/model.ts';
 import { loadProjectDeclaration, type ProjectDeclaration } from '../ports/project.ts';
 import { converse, type ConversationState } from '../ui/conversation.ts';
 import { validSpecification } from './fixtures/valid-specification.ts';
@@ -72,6 +72,19 @@ describe('conversational specification intake', () => {
     expect(result.status).toBe('sealed');
     expect(result.state.answers).toHaveLength(2);
     expect(complete).toHaveBeenCalledOnce();
+  });
+
+  it('gives the translator the exact slot schema instead of asking it to guess shapes', async () => {
+    let valueSchema: unknown;
+    const model: ModelPort = {
+      complete: async (request) => {
+        valueSchema = request.valueSchema;
+        return { assistantMessage: 'More detail is needed.', answers: [] };
+      },
+    };
+    await converse(state({}), project(), 'local-user', 'Build a CSV export.', model);
+    expect(JSON.stringify(valueSchema)).toContain('"kind":{"type":"string","enum":["change","spike"]}');
+    expect(JSON.stringify(valueSchema)).toContain('"blockingDecisions":{"type":"array"');
   });
 
   it('allows the same entitled user to complete a technical gap without changing the rule', async () => {
@@ -164,6 +177,19 @@ describe('conversational specification intake', () => {
     expect(result).toEqual(expect.objectContaining({
       status: 'refused',
       reason: 'the configured model is unavailable',
+      state: expect.objectContaining({ draft: {} }),
+    }));
+  });
+
+  it('reports a timed-out model without calling it unavailable', async () => {
+    const initial = state({});
+    const model: ModelPort = {
+      complete: async () => { throw new ModelPortError('timed_out', 'deadline expired'); },
+    };
+    const result = await converse(initial, project(), 'local-user', 'Build an export screen.', model);
+    expect(result).toEqual(expect.objectContaining({
+      status: 'refused',
+      reason: 'the configured model request timed out',
       state: expect.objectContaining({ draft: {} }),
     }));
   });

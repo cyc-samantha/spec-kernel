@@ -15,6 +15,7 @@ export interface ModelRequest {
   messages: readonly ConversationMessage[];
   draft: unknown;
   missing: readonly MissingItem[];
+  valueSchema: unknown;
 }
 
 /**
@@ -49,7 +50,7 @@ export interface ModelPort {
   complete(request: ModelRequest): Promise<unknown>;
 }
 
-export type ModelPortFailure = 'unavailable' | 'invalid_response';
+export type ModelPortFailure = 'unavailable' | 'invalid_response' | 'timed_out';
 
 export class ModelPortError extends Error {
   readonly failure: ModelPortFailure;

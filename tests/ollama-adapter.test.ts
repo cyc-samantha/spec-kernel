@@ -7,6 +7,10 @@ function request(): ModelRequest {
   return {
     messages: [{ role: 'user', content: 'There are no blocking decisions.' }],
     draft: { title: 'Example' },
+    valueSchema: {
+      type: 'object',
+      properties: { blockingDecisions: { type: 'array' } },
+    },
     missing: [{
       ruleId: 'blocking-decisions-declared',
       slot: 'blockingDecisions',
@@ -48,9 +52,14 @@ describe('Ollama model adapter', () => {
     expect(body).toEqual(expect.objectContaining({
       model: 'local-model',
       stream: false,
+      think: false,
+      keep_alive: '10m',
       format: expect.objectContaining({ type: 'object' }),
+      options: { temperature: 0, num_predict: 1024 },
     }));
     expect(JSON.stringify(body)).toContain('blocking-decisions-declared');
+    expect(JSON.stringify(body)).toContain('blockingDecisions');
+    expect(JSON.stringify(body)).toContain('Use the supplied valueSchema');
     expect(JSON.stringify(body)).toContain('Never claim that a specification is complete or sealed');
   });
 
@@ -62,6 +71,33 @@ describe('Ollama model adapter', () => {
     await expect(adapter.complete(request())).rejects.toMatchObject({
       failure: 'unavailable',
     } satisfies Partial<ModelPortError>);
+  });
+
+  it('reports a model deadline separately from an offline runtime', async () => {
+    const adapter = new OllamaAdapter({
+      model: 'local-model',
+      timeoutMs: 5,
+      fetch: vi.fn<typeof fetch>().mockRejectedValue(new DOMException('expired', 'TimeoutError')),
+    });
+    await expect(adapter.complete(request())).rejects.toMatchObject({
+      failure: 'timed_out',
+    } satisfies Partial<ModelPortError>);
+  });
+
+  it('uses an explicit output budget when the deployment overrides it', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      message: { content: JSON.stringify({ assistantMessage: 'No answer.', answers: [] }) },
+    }), { status: 200 }));
+    const adapter = new OllamaAdapter({
+      model: 'local-model',
+      maxOutputTokens: 73,
+      fetch: fetchMock,
+    });
+    await adapter.complete(request());
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)) as {
+      options: { num_predict: number };
+    };
+    expect(body.options.num_predict).toBe(73);
   });
 
   it('refuses an unevaluable model envelope', async () => {

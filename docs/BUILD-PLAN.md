@@ -341,6 +341,11 @@ cover several gaps so local hardware does not pay one inference per slot.
 - The model cannot choose an unoffered slot and cannot return `sealed`.
 - Offline, malformed, oversized, duplicate, or out-of-scope model output refuses
   without advancing the draft.
+- Structured extraction disables unbounded thinking, caps output, keeps the
+  model warm, and distinguishes a deadline from an unreachable runtime.
+- The translator receives the specification's machine-readable schema. It may
+  translate a human fact into that shape; it still may not invent a fact or a
+  verdict.
 - A locally entitled identity may fill both requester and technical-author gaps;
   otherwise the same workflow ends in the successful technical handoff from D16.
 

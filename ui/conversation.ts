@@ -2,7 +2,9 @@ import { recordAnswer, type SlotAnswer } from '../kernel/answers.ts';
 import { advanceInterview, type InterviewAttempt } from '../kernel/interview.ts';
 import { sealCheck, type MissingItem } from '../kernel/seal-check.ts';
 import type { Entitlement } from '../kernel/rules.ts';
+import { specificationSchema } from '../kernel/specification.ts';
 import type { ProjectDeclaration } from '../ports/project.ts';
+import { z } from 'zod';
 import {
   conversationMessageSchema,
   loadModelProposal,
@@ -17,6 +19,8 @@ export interface ConversationState {
   attempts: readonly InterviewAttempt[];
   answers: readonly SlotAnswer[];
 }
+
+const specificationValueSchema = z.toJSONSchema(specificationSchema);
 
 export type ConversationResult =
   | { status: 'ask'; state: ConversationState; missing: MissingItem; prompt: string }
@@ -155,11 +159,18 @@ export async function converse(
 
   let raw: unknown;
   try {
-    raw = await model.complete({ messages: current.messages, draft: current.draft, missing: offered });
+    raw = await model.complete({
+      messages: current.messages,
+      draft: current.draft,
+      missing: offered,
+      valueSchema: specificationValueSchema,
+    });
   } catch (error) {
     const reason = error instanceof ModelPortError && error.failure === 'invalid_response'
       ? 'the configured model returned an invalid response'
-      : 'the configured model is unavailable';
+      : error instanceof ModelPortError && error.failure === 'timed_out'
+        ? 'the configured model request timed out'
+        : 'the configured model is unavailable';
     return { status: 'refused', state: current, reason };
   }
   const loaded = loadModelProposal(raw);
