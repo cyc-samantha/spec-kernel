@@ -151,7 +151,7 @@ const structuralRules: readonly Rule[] = [
   slotRule({
     id: 'title-stated',
     slot: 'title',
-    question: 'What one line names this piece of work?',
+    question: 'In one line, what should this work be called?',
     entitlement: 'requester',
     authorship: 'human_confirms',
     schema: nonBlank,

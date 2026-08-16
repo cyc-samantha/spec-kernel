@@ -70,10 +70,19 @@ describe('reading a confirmation out of what a person typed', () => {
     });
   });
 
-  /** Unevaluable input: nothing to read, and nothing standing to read it against. */
-  it('refuses a blank message and refuses an agreement with nothing drafted', () => {
+  /** Unevaluable input: nothing to read it from. */
+  it('refuses a blank message', () => {
     expect(readConfirmation('   ', [proposal('scope')])).toEqual({ kind: 'none' });
     expect(readConfirmation('!!!', [proposal('scope')])).toEqual({ kind: 'none' });
-    expect(readConfirmation('yes', [])).toEqual({ kind: 'none' });
+  });
+
+  /*
+   * Agreement with nothing standing is not an answer to the question on screen.
+   * Reporting it as one spent an inference and a stall on a turn that held no
+   * information either way.
+   */
+  it('separates agreement with nothing pending from a message that is not agreement', () => {
+    expect(readConfirmation('yes', [])).toEqual({ kind: 'nothing_pending' });
+    expect(readConfirmation('a data mapping tool', [])).toEqual({ kind: 'none' });
   });
 });

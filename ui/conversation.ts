@@ -387,6 +387,25 @@ function humanSuppliedAnswers(
   });
 }
 
+/*
+ * Naming a drafted slot tells the requester nothing they can act on: they can
+ * see neither what was understood nor what to do about it, while the next
+ * question is already about something else. Show the value, then the one thing
+ * that takes it.
+ */
+function draftedMessage(drafted: readonly SlotProposal[]): string {
+  const shown = drafted.map((item) => `  ${item.slot} = ${JSON.stringify(item.value)}`).join('\n');
+  return `I drafted this from what you said:\n${shown}\n${howToAccept(drafted)}`;
+}
+
+function howToAccept(drafted: readonly SlotProposal[]): string {
+  const granting = drafted.filter((item) => item.consequence === 'authority');
+  if (granting.length === 0) return 'Say "yes" to take it, or tell me what to change.';
+  const named = granting.map((item) => `"confirm ${item.slot}"`).join(', ');
+  const others = drafted.length > granting.length ? ' "yes" takes the others.' : '';
+  return `Say ${named} to grant that — a general yes cannot.${others} Or tell me what to change.`;
+}
+
 /** The ledger narrates progress; model prose cannot claim writes that did not happen. */
 function progressMessage(
   beforeAnswerCount: number,
@@ -398,12 +417,11 @@ function progressMessage(
   const derived = recorded.filter((answer) => answer.source === 'derived').map((answer) => answer.slot);
   const prior = new Map(beforeProposals.map((proposal) => [gapKey(proposal), proposal]));
   const drafted = state.proposals
-    .filter((proposal) => !sameProposal(prior.get(gapKey(proposal)), proposal))
-    .map((proposal) => proposal.slot);
+    .filter((proposal) => !sameProposal(prior.get(gapKey(proposal)), proposal));
   return [
     human.length > 0 ? `I recorded ${human.join(', ')}.` : '',
     derived.length > 0 ? `I derived ${derived.join(', ')}.` : '',
-    drafted.length > 0 ? `Drafts awaiting your confirmation: ${drafted.join(', ')}.` : '',
+    drafted.length > 0 ? draftedMessage(drafted) : '',
   ].filter(Boolean).join(' ');
 }
 
@@ -435,6 +453,14 @@ export async function converse(
   if (spoken.kind === 'needs_naming') {
     return askResult(current, initialStep, authorityNaming(spoken.slots));
   }
+  /*
+   * Agreement with nothing standing carries no information either way. Sending
+   * it to the translator spends an inference to learn that, and records a
+   * stalled attempt on a question the requester never actually declined.
+   */
+  if (spoken.kind === 'nothing_pending') {
+    return askResult(current, initialStep, 'Nothing is waiting for your agreement right now.');
+  }
 
   const offered = new Map(eligibleMissing(current.draft, project, identity).map((item) => [gapKey(item), item]));
   const beforeAnswerCount = current.answers.length;
@@ -453,7 +479,10 @@ export async function converse(
       messages: current.messages,
       draft: current.draft,
       focus,
-      missing: [...presented.values()],
+      // The gap being asked leads the list it appears in: a translator with a
+      // two-entry budget ranks what it is given, and last is where a gap goes
+      // unanswered for four turns.
+      missing: [focus, ...[...presented.values()].filter((item) => gapKey(item) !== gapKey(focus))],
       drafted: current.proposals.map((proposal) => proposal.slot),
     });
   } catch (error) {

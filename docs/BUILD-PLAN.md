@@ -533,6 +533,34 @@ routine draft into the document.
 
 ---
 
+### S17 · The interview answers what the requester said — **DONE**
+
+`branch: s17-answer-what-was-said`
+
+A requester stated their scope as four column mappings and was answered
+"Drafts awaiting your confirmation: scope." followed by a question about the
+title. The turn had understood them; nothing they could see said so, and the
+only visible thing was a question about something else.
+
+- A drafted value appears in the conversation with the one thing that takes
+  it, rather than as a slot name beside an unrelated question. A grant of
+  authority names its own confirmation, because a general yes cannot reach it.
+- The gap being asked leads the gaps list the translator receives. With a
+  two-entry budget against eleven offered gaps, last is where a gap goes
+  unanswered for four turns — which is what happened to every title.
+- `title-stated` asks "In one line, what should this work be called?". The
+  previous wording made "one line" the subject of "names"; every sibling
+  question is ordinary word order, and this one read as a riddle.
+- Agreement with nothing pending is read as itself. It had been sent to the
+  translator, which cost an inference to learn nothing and recorded a stalled
+  attempt against a question the requester never declined.
+
+**Done when**: a turn that states a compound value shows what was understood
+and how to accept it, and the title arrives as a draft rather than a question
+asked four times.
+
+---
+
 ## Deliberately not built
 
 Written down so nobody rediscovers them mid-build.

@@ -8,6 +8,7 @@ import type { SlotProposal } from './conversation.ts';
  */
 export type ConfirmationRead =
   | { kind: 'none' }
+  | { kind: 'nothing_pending' }
   | { kind: 'confirms'; slots: readonly string[] }
   | { kind: 'needs_naming'; slots: readonly string[] };
 
@@ -41,7 +42,7 @@ function namedIn(spoken: readonly string[], proposals: readonly SlotProposal[]):
 function decide(candidates: readonly SlotProposal[], named: boolean): ConfirmationRead {
   const reachable = named ? candidates : candidates.filter((item) => item.consequence !== 'authority');
   if (reachable.length > 0) return { kind: 'confirms', slots: reachable.map((item) => item.slot) };
-  if (candidates.length === 0) return { kind: 'none' };
+  if (candidates.length === 0) return { kind: 'nothing_pending' };
   return { kind: 'needs_naming', slots: candidates.map((item) => item.slot) };
 }
 

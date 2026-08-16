@@ -79,6 +79,31 @@ describe('conversational specification intake', () => {
     expect(complete).toHaveBeenCalledOnce();
   });
 
+  /*
+   * The translator answers at most two gaps per turn out of up to eleven on
+   * offer. A live intake spent four turns without ever drafting the title,
+   * because the gap being asked was one entry in a list it could rank freely.
+   */
+  it('offers the gap it is asking about first', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['title'];
+    delete draft['constraints'];
+    delete draft['blockingDecisions'];
+    let seen: readonly { slot: string }[] = [];
+
+    await converse(state(draft), project(), 'local-user', 'A tool that maps columns.', {
+      complete: async (request) => {
+        seen = request.missing;
+        return { answers: [], proposals: [] };
+      },
+    });
+
+    expect(seen[0]?.slot).toBe('title');
+    expect(seen.map((item) => item.slot)).toEqual(
+      expect.arrayContaining(['title', 'constraints', 'blockingDecisions']),
+    );
+  });
+
   it('gives each gap its own slot schema instead of asking the translator to guess shapes', async () => {
     let gaps: readonly { slot: string; valueSchema: unknown }[] = [];
     const model: ModelPort = {
@@ -328,7 +353,8 @@ describe('conversational specification intake', () => {
     expect(focuses).toEqual(['intent', 'scope']);
     expect(presented[1]).toEqual(['scope']);
     expect(second.state.proposals.map((proposal) => proposal.slot)).toEqual(['intent', 'scope']);
-    expect(second.state.messages.at(-1)?.content).toContain('Drafts awaiting your confirmation: scope.');
+    expect(second.state.messages.at(-1)?.content).toContain('I drafted this from what you said:');
+    expect(second.state.messages.at(-1)?.content).toContain('scope = ');
     expect(second.state.messages.at(-1)?.content).not.toContain('That did not answer');
   });
 
@@ -386,6 +412,60 @@ describe('conversational specification intake', () => {
     expect(result.state.messages.at(-1)?.content).toBe(
       'That did not answer the question I asked. Which decisions are still open and block this work? An empty list is an answer.',
     );
+  });
+
+  /*
+   * A live turn stating four column mappings answered "Drafts awaiting your
+   * confirmation: scope." and then asked about the title. The requester could
+   * see neither what had been understood nor what to do about it.
+   */
+  it('shows a drafted value in the conversation and how to take it', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['scope'];
+    const mappings = { include: ['first name -- surname', 'date of birth -- DOB'], exclude: [] };
+
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'scope should include first name -- surname and date of birth -- DOB',
+      responses({
+        answers: [],
+        proposals: [{
+          ruleId: 'scope-bounded', slot: 'scope', value: mappings,
+          reason: 'the requester listed the columns',
+        }],
+      }),
+    );
+
+    const said = result.state.messages.at(-1)?.content ?? '';
+    expect(said).toContain('first name -- surname');
+    expect(said).toContain('date of birth -- DOB');
+    expect(said).toContain('Say "yes" to take it');
+  });
+
+  it('names the grant a general agreement cannot reach', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['authority'];
+
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'An agent may edit the implementation.',
+      responses({
+        answers: [],
+        proposals: [{
+          ruleId: 'authority-granted', slot: 'authority',
+          value: { allowed: ['edit implementation'], requiresHuman: [], automationLevel: 'agent-with-review' },
+          reason: 'the requester described supervised editing',
+        }],
+      }),
+    );
+
+    const said = result.state.messages.at(-1)?.content ?? '';
+    expect(said).toContain('"confirm authority"');
+    expect(said).toContain('a general yes cannot');
   });
 
   it('describes progress from recorded slots instead of model narration', async () => {

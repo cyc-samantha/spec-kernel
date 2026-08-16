@@ -96,6 +96,9 @@ Produce the exact JSON type and shape that gap's valueSchema requires.
 answers: gaps the human actually answered or explicitly confirmed. Use only facts they stated.
 proposals: your own draft for gaps they did not answer, each with a short reason naming what in the
 conversation it rests on. A draft is a suggestion for a person to accept or correct, never an answer.
+focusGap is the gap the requester is being asked about right now, and it leads the gaps list. Always
+return an entry for it — an answer when they stated it, a proposal otherwise — unless nothing anywhere
+in the conversation bears on it. A title, for instance, is a one-line name for the work they described.
 Prioritize facts in the latest human message, then focusGap. When the message corrects a pending proposal,
 return that correction before unrelated gaps. Return no more than two entries total across answers
 and proposals. Do not fill unrelated gaps with generic defaults. Leave a gap out when you have
