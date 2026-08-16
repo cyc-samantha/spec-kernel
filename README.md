@@ -147,6 +147,12 @@ machine-readable specification schema so a small local model does not have to
 guess slot shapes. A deadline is reported as `model request timed out`;
 `model unavailable` is reserved for a runtime that cannot be reached.
 
+Each turn focuses a bounded set of Rule gaps. Drafted values remain visible
+across turns and never become answers because the model repeated them. Progress
+messages come from the answer ledger, not model narration. Proposal JSON is
+editable in the browser; confirmation reruns an edited value through its Rule
+and records the confirming person as its author.
+
 The UI process does not hot-reload source or environment variables. After an
 update or configuration change, stop it with `Ctrl+C` and run `npm run ui` again.
 
@@ -155,7 +161,7 @@ no framework, bundler, or build step.
 
 ## Status
 
-The deterministic v0.1 kernel MVP is complete, and S10 adds the adaptable
-conversational application: slices S0–S10 are implemented and recorded in
+The deterministic v0.1 kernel MVP and conversational workflow are complete:
+slices S0–S15 are implemented and recorded in
 `docs/BUILD-PLAN.md`. Profile and Shape still deliberately ship with no
 mechanism; they wait for a real cross-project conflict.
