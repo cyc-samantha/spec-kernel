@@ -4,6 +4,7 @@ import { advanceInterview, type InterviewAttempt } from '../kernel/interview.ts'
 import { sealCheck, type MissingItem } from '../kernel/seal-check.ts';
 import type { Consequence, Entitlement, RuleId } from '../kernel/rules.ts';
 import type { ProjectDeclaration } from '../ports/project.ts';
+import { readConfirmation } from './confirmation.ts';
 import { modelRefusalReason } from './model-refusal.ts';
 import {
   conversationMessageSchema,
@@ -332,6 +333,23 @@ function promptFor(
   return `I drafted an answer for this. Confirm it above, or correct me here. ${step.missing.question}`;
 }
 
+/*
+ * Saying a turn failed is only useful beside a way out of it. Both routes named
+ * here are ones the requester can take by typing, because that is now the only
+ * thing they have.
+ */
+function untranslated(slot: string): string {
+  return `I could not turn that into ${slot}. The draft above is still my earlier guess — say "confirm ${slot}" to take it as it stands, or say the value again in one line.`;
+}
+
+/*
+ * A grant of authority nobody read is a grant the machine made itself (D14).
+ * Agreement is enough for a routine draft; this one has to be said by name.
+ */
+function authorityNaming(slots: readonly string[]): string {
+  return `${slots.join(', ')} decides what an Agent may do unsupervised, so I cannot take a general yes for it. Say "confirm ${slots[0]}" to grant it, or tell me what it should say instead.`;
+}
+
 function askResult(
   state: ConversationState,
   step: Extract<ReturnType<typeof advanceInterview>, { status: 'ask' }>,
@@ -353,17 +371,19 @@ function sameProposal(left: SlotProposal | undefined, right: SlotProposal): bool
     && JSON.stringify(left.value) === JSON.stringify(right.value);
 }
 
-function redirectedPendingAnswers(
+/*
+ * An answer identical to a standing draft is the model rubber-stamping itself,
+ * and only a person may accept a draft (D8). A different value is content the
+ * human supplied, and what a human states outranks what a machine drafted for
+ * the same slot — discarding it leaves the machine's guess in its place.
+ */
+function humanSuppliedAnswers(
   pending: ReadonlyMap<string, SlotProposal>,
   answers: readonly { ruleId: string; slot: string; value: unknown }[],
-): readonly { ruleId: string; slot: string; value: unknown; reason: string }[] {
-  return answers.flatMap((answer) => {
-    const previous = pending.get(gapKey(answer));
-    if (!previous || JSON.stringify(previous.value) === JSON.stringify(answer.value)) return [];
-    return [{
-      ...answer,
-      reason: 'the latest human message supplied a correction to this pending draft',
-    }];
+): readonly { ruleId: string; slot: string; value: unknown }[] {
+  return answers.filter((answer) => {
+    const drafted = pending.get(gapKey(answer));
+    return !drafted || JSON.stringify(drafted.value) !== JSON.stringify(answer.value);
   });
 }
 
@@ -410,6 +430,12 @@ export async function converse(
   if (initialStep.status !== 'ask') {
     return { status: 'refused', state: current, reason: 'the current Rule question could not be selected' };
   }
+  const spoken = readConfirmation(userMessage, current.proposals);
+  if (spoken.kind === 'confirms') return confirmProposals(current, project, identity, spoken.slots);
+  if (spoken.kind === 'needs_naming') {
+    return askResult(current, initialStep, authorityNaming(spoken.slots));
+  }
+
   const offered = new Map(eligibleMissing(current.draft, project, identity).map((item) => [gapKey(item), item]));
   const beforeAnswerCount = current.answers.length;
   const focus = modelFocus(userMessage, current.proposals, offered, initialStep.missing);
@@ -428,35 +454,32 @@ export async function converse(
       draft: current.draft,
       focus,
       missing: [...presented.values()],
-      proposals: current.proposals,
+      drafted: current.proposals.map((proposal) => proposal.slot),
     });
   } catch (error) {
     return { status: 'refused', state: current, reason: modelRefusalReason(error, 'conversation') };
   }
   const loaded = loadModelProposal(raw);
   if (!loaded.ok) return { status: 'refused', state: current, reason: loaded.reason };
-  if (loaded.proposal.answers.some((answer) => !presented.has(gapKey(answer)))) {
-    return { status: 'refused', state: current, reason: 'the model proposed an answer outside the offered Rule gaps' };
-  }
-  if (loaded.proposal.proposals.some((proposal) => !presented.has(gapKey(proposal)))) {
-    return { status: 'refused', state: current, reason: 'the model proposed a draft outside the offered Rule gaps' };
-  }
+  /*
+   * A candidate for a gap that was not offered is discarded, never honoured —
+   * the model writes only where it was asked. Refusing the whole turn over one
+   * would throw away the candidates that were in scope, and the requester's own
+   * words with them, to punish a mistake only the model made.
+   */
+  const inScope = <T extends { ruleId: string; slot: string }>(items: readonly T[]): T[] =>
+    items.filter((item) => presented.has(gapKey(item)));
 
   // A standing machine draft can become an answer only through the named,
   // deterministic confirmation route below. Letting the translator copy it
   // into answers would allow the model to approve its own proposal.
   const pending = new Map(current.proposals.map((proposal) => [gapKey(proposal), proposal]));
-  const directAnswers = loaded.proposal.answers.filter((answer) => !pending.has(gapKey(answer)));
-  const redirected = redirectedPendingAnswers(pending, loaded.proposal.answers);
-  const applied = applyModelAnswers(current, presented, directAnswers, identity, project);
+  const supplied = humanSuppliedAnswers(pending, inScope(loaded.proposal.answers));
+  const applied = applyModelAnswers(current, presented, supplied, identity, project);
   current = withDerivations(applied, project);
   current = {
     ...current,
-    proposals: mergeUsableProposals(
-      current,
-      state.proposals,
-      [...redirected, ...loaded.proposal.proposals],
-    ),
+    proposals: mergeUsableProposals(current, state.proposals, inScope(loaded.proposal.proposals)),
   };
   current = withAttempt(
     current,
@@ -467,9 +490,7 @@ export async function converse(
     correctionIsNew,
   );
   const progress = progressMessage(beforeAnswerCount, state.proposals, current);
-  const narration = progress || (correctionIsNew
-    ? `I could not apply the ${focus.slot} correction automatically. Edit that drafted JSON value above, then confirm it.`
-    : '');
+  const narration = progress || (correctionIsNew ? untranslated(focus.slot) : '');
 
   const step = nextStep(current, project, identity);
   const terminal = terminalResult(step, current, narration);
@@ -507,23 +528,7 @@ export function confirmProposals(
   slots: readonly string[],
 ): ConversationResult {
   const named = new Set(slots);
-  const selected = state.proposals
-    .filter((proposal) => named.has(proposal.slot))
-    .map((proposal) => ({ slot: proposal.slot, value: proposal.value }));
-  return confirmProposalValues(state, project, identity, selected);
-}
-
-/** Validates human-edited drafts through the same Rule before recording them. */
-export function confirmProposalValues(
-  state: ConversationState,
-  project: ProjectDeclaration,
-  identity: string,
-  selections: readonly { slot: string; value: unknown }[],
-): ConversationResult {
-  const selected = selections.flatMap((selection) => {
-    const proposal = state.proposals.find((candidate) => candidate.slot === selection.slot);
-    return proposal ? [{ ...proposal, value: selection.value }] : [];
-  });
+  const selected = state.proposals.filter((proposal) => named.has(proposal.slot));
   if (selected.length === 0) {
     return { status: 'refused', state, reason: 'a confirmation must name at least one drafted slot' };
   }

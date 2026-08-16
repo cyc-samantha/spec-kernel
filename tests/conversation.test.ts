@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ModelPortError, type ModelPort } from '../ports/model.ts';
 import { loadProjectDeclaration, type ProjectDeclaration } from '../ports/project.ts';
 import { sealCheck } from '../kernel/seal-check.ts';
-import { confirmProposalValues, confirmProposals, converse, type ConversationState } from '../ui/conversation.ts';
+import { confirmProposals, converse, type ConversationState } from '../ui/conversation.ts';
 import { validSpecification } from './fixtures/valid-specification.ts';
 
 function project(): ProjectDeclaration {
@@ -213,14 +213,20 @@ describe('conversational specification intake', () => {
     ]);
   });
 
-  it('carries pending proposals into the next model turn and does not erase them', async () => {
+  /*
+   * A drafted value in the translator's view anchors a small model onto it: the
+   * turn that enumerated four column mappings came back with the one mapping the
+   * standing draft held. The slot name is what it needs — enough not to redraft,
+   * with nothing to copy.
+   */
+  it('tells the next model turn which slots are drafted without showing it the drafts', async () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['constraints'];
     delete draft['blockingDecisions'];
     const seen: unknown[] = [];
     const model: ModelPort = {
       complete: async (request) => {
-        seen.push(request.proposals);
+        seen.push(request.drafted);
         if (seen.length === 1) {
           return {
             assistantMessage: 'I drafted the remaining constraints.',
@@ -249,9 +255,7 @@ describe('conversational specification intake', () => {
     const second = await converse(first.state, project(), 'local-user', 'There are no blocking decisions.', model);
 
     expect(seen[0]).toEqual([]);
-    expect(seen[1]).toEqual([
-      expect.objectContaining({ slot: 'constraints', value: [] }),
-    ]);
+    expect(seen[1]).toEqual(['constraints']);
     expect(second.state.proposals).toEqual([
       expect.objectContaining({ slot: 'constraints', value: [] }),
     ]);
@@ -490,6 +494,59 @@ describe('conversational specification intake', () => {
     expect(result.state.answers).toEqual([]);
   });
 
+  it('records a draft the requester accepted in the chat, without asking the model', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    const carried: ConversationState = {
+      ...state(draft),
+      proposals: [{
+        ruleId: 'blocking-decisions-declared',
+        slot: 'blockingDecisions',
+        question: 'Which decisions are still open and block this work? An empty list is an answer.',
+        value: [],
+        reason: 'you said nothing else is blocked',
+        consequence: 'routine',
+        entitlement: 'requester',
+      }],
+    };
+    const complete = vi.fn();
+
+    const result = await converse(carried, project(), 'local-user', 'yes', { complete });
+
+    expect(complete).not.toHaveBeenCalled();
+    expect(result.status).toBe('sealed');
+    expect(result.state.answers).toEqual([
+      expect.objectContaining({ slot: 'blockingDecisions', source: 'human', answeredBy: 'local-user' }),
+    ]);
+    expect(result.state.proposals).toEqual([]);
+  });
+
+  /* D14: losing the tick box must not lose the reading that preceded it. */
+  it('asks for an authority draft by name rather than taking agreement for a grant', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['authority'];
+    const carried: ConversationState = {
+      ...state(draft),
+      proposals: [{
+        ruleId: 'authority-granted',
+        slot: 'authority',
+        question: 'What may an Agent do without asking, and what must it bring back to a human?',
+        value: { allowed: ['edit implementation'], requiresHuman: [], automationLevel: 'agent-with-review' },
+        reason: 'drafted from the described change',
+        consequence: 'authority',
+        entitlement: 'requester',
+      }],
+    };
+    const complete = vi.fn();
+
+    const result = await converse(carried, project(), 'local-user', 'yes', { complete });
+
+    expect(complete).not.toHaveBeenCalled();
+    expect(result.state.draft).not.toEqual(expect.objectContaining({ authority: expect.anything() }));
+    expect(result.state.messages.at(-1)?.content).toContain('what an Agent may do unsupervised');
+    expect(result.state.messages.at(-1)?.content).toContain('confirm authority');
+  });
+
   it('records a confirmed draft as the confirming person answer', async () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['blockingDecisions'];
@@ -516,33 +573,6 @@ describe('conversational specification intake', () => {
       expect.objectContaining({ slot: 'blockingDecisions', answeredBy: 'local-user', source: 'human' }),
     ]);
     expect(confirmed.state.proposals).toEqual([]);
-  });
-
-  it('validates and records a human-edited proposal value', () => {
-    const draft = validSpecification() as unknown as Record<string, unknown>;
-    delete draft['scope'];
-    const carried: ConversationState = {
-      ...state(draft),
-      proposals: [{
-        ruleId: 'scope-bounded',
-        slot: 'scope',
-        question: 'What is inside this change, and what is explicitly outside it?',
-        value: { include: ['column mapping logic'], exclude: [] },
-        reason: 'drafted from the initial description',
-        consequence: 'routine',
-        entitlement: 'requester',
-      }],
-    };
-    const mappings = {
-      include: ['first name -> surname', 'last name -> forename', 'full name -> Name', 'date of birth -> DOB'],
-      exclude: [],
-    };
-
-    const result = confirmProposalValues(carried, project(), 'local-user', [{ slot: 'scope', value: mappings }]);
-
-    expect(result.status).toBe('sealed');
-    expect(result.state.draft).toEqual(expect.objectContaining({ scope: mappings }));
-    expect(result.state.answers.at(-1)).toEqual(expect.objectContaining({ slot: 'scope', value: mappings }));
   });
 
   it('does not let the model confirm its own pending proposal', async () => {
@@ -586,7 +616,12 @@ describe('conversational specification intake', () => {
     ]);
   });
 
-  it('downgrades a model correction to a pending answer back into a proposal', async () => {
+  /*
+   * A live 2b run answered this exact turn correctly and the application threw
+   * the answer away, keeping instead the model's own reconciliation of it — which
+   * had moved three of the four stated mappings into exclude.
+   */
+  it('records what the human stated for a slot a machine had already drafted', async () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['scope'];
     const carried: ConversationState = {
@@ -617,18 +652,17 @@ describe('conversational specification intake', () => {
       }),
     );
 
-    expect(corrected.state.draft).not.toEqual(expect.objectContaining({ scope: expect.anything() }));
-    expect(corrected.state.answers).toEqual([]);
-    expect(corrected.state.proposals).toEqual([
-      expect.objectContaining({
-        slot: 'scope',
-        value: { include: ['first name -> surname', 'date of birth -> DOB'], exclude: [] },
-      }),
+    expect(corrected.state.draft).toEqual(expect.objectContaining({
+      scope: { include: ['first name -> surname', 'date of birth -> DOB'], exclude: [] },
+    }));
+    expect(corrected.state.answers).toEqual([
+      expect.objectContaining({ slot: 'scope', source: 'human', answeredBy: 'local-user' }),
     ]);
+    expect(corrected.state.proposals).toEqual([]);
     expect(corrected.state.attempts.at(-1)?.yieldedNewInformation).toBe(true);
   });
 
-  it('routes an unparsed pending correction to the editable draft without stalling', async () => {
+  it('offers a spoken way out of a correction it could not translate', async () => {
     const draft = validSpecification() as unknown as Record<string, unknown>;
     delete draft['title'];
     delete draft['scope'];
@@ -655,8 +689,9 @@ describe('conversational specification intake', () => {
 
     expect(result.state.attempts.at(-1)?.yieldedNewInformation).toBe(true);
     expect(result.state.messages.at(-1)?.content).toContain(
-      'I could not apply the scope correction automatically. Edit that drafted JSON value above, then confirm it.',
+      'I could not turn that into scope.',
     );
+    expect(result.state.messages.at(-1)?.content).toContain('say "confirm scope"');
     expect(result.state.messages.at(-1)?.content).not.toContain('That did not answer');
   });
 
@@ -689,6 +724,37 @@ describe('conversational specification intake', () => {
     );
 
     expect(result.state.proposals).toEqual([]);
+  });
+
+  /*
+   * A live turn answered the title question and also returned a value for a gap
+   * that was not on offer. Refusing the whole turn cost the requester the answer
+   * they had actually given, to punish a mistake only the model made.
+   */
+  it('discards a candidate for a gap it was not offered and keeps the rest', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['title'];
+    delete draft['blockingDecisions'];
+
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'Map source columns onto the target schema.',
+      responses({
+        answers: [
+          { ruleId: 'title-stated', slot: 'title', value: 'Map source columns onto the target schema' },
+          { ruleId: 'target-named', slot: 'target', value: 'somewhere/else' },
+        ],
+        proposals: [],
+      }),
+    );
+
+    expect(result.status).toBe('ask');
+    expect(result.state.draft).toEqual(expect.objectContaining({
+      title: 'Map source columns onto the target schema',
+      target: 'example-repository',
+    }));
   });
 
   it('refuses malformed model output instead of treating it as an answer', async () => {

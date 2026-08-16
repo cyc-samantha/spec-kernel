@@ -44,7 +44,7 @@ conflict demands it, not before.
 An engineer writes a draft and the kernel finds the holes. Someone who cannot
 write a draft never has to invent one: slots with a single correct value are
 derived and never asked, and the rest are drafted by the model — each with the
-reason it rests on — for that person to correct or confirm. Same slots, same
+reason it rests on — for that person to accept or replace in conversation. Same slots, same
 checks, and a finished specification does not reveal which door it came through.
 
 The questions are not authored. They are derived from the checks: a question
@@ -149,9 +149,14 @@ guess slot shapes. A deadline is reported as `model request timed out`;
 
 Each turn focuses a bounded set of Rule gaps. Drafted values remain visible
 across turns and never become answers because the model repeated them. Progress
-messages come from the answer ledger, not model narration. Proposal JSON is
-editable in the browser; confirmation reruns an edited value through its Rule
-and records the confirming person as its author.
+messages come from the answer ledger, not model narration.
+
+Accepting a draft is something the requester types. Agreement is recognised
+deterministically, before any inference, so the model never sees a confirmation
+of its own work; a message that carries content is not agreement, and is
+translated as an ordinary answer instead. A draft that decides what an Agent may
+do unsupervised is unreachable by a general yes and must be named. The drafts
+panel reports what was guessed and why — it is not a second way to answer.
 
 The UI process does not hot-reload source or environment variables. After an
 update or configuration change, stop it with `Ctrl+C` and run `npm run ui` again.

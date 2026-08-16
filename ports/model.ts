@@ -21,15 +21,7 @@ export interface ModelRequest {
   draft: unknown;
   focus: MissingItem;
   missing: readonly MissingItem[];
-  proposals: readonly PendingProposal[];
-}
-
-/** Machine drafts already shown to the requester but not yet confirmed. */
-export interface PendingProposal {
-  ruleId: string;
-  slot: string;
-  value: unknown;
-  reason: string;
+  drafted: readonly string[];
 }
 
 /**
