@@ -59,14 +59,14 @@ describe('model port response boundary', () => {
     });
   });
 
-  it('refuses an unbounded batch from a model turn', () => {
+  it('refuses a turn with more than two slot values across answers and proposals', () => {
     expect(loadModelProposal({
-      answers: Array.from({ length: 5 }, (_, index) => ({
+      answers: Array.from({ length: 2 }, (_, index) => ({
         ruleId: `rule-${index}`,
         slot: `slot-${index}`,
         value: index,
       })),
-      proposals: [],
+      proposals: [{ ruleId: 'rule-2', slot: 'slot-2', value: 2, reason: 'supported by the request' }],
     })).toEqual({
       ok: false,
       reason: 'the model response did not match the proposal schema',
