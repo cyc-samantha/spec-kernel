@@ -70,7 +70,7 @@ describe('Ollama model adapter', () => {
       think: false,
       keep_alive: '10m',
       format: expect.objectContaining({ type: 'object' }),
-      options: expect.objectContaining({ temperature: 0, num_predict: 4096 }),
+      options: expect.objectContaining({ temperature: 0, num_predict: 1024 }),
     }));
     expect(JSON.stringify(body)).toContain('blocking-decisions-declared');
     expect(JSON.stringify(body)).toContain('blockingDecisions');

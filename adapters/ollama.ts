@@ -8,7 +8,10 @@ import {
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:11434';
 const DEFAULT_TIMEOUT_MS = 300_000;
-const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+// One turn translates bounded slot values, not a document-sized answer. Keep
+// this aligned with README so a small local model cannot spend minutes filling
+// an output budget the application neither needs nor displays.
+const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
 /*
  * Ollama defaults this to 4096 and silently drops whatever does not fit — a
  * 33 KB conversation came back as prompt_eval_count=25 with a confident wrong
