@@ -276,7 +276,7 @@ differ. A kernel constant, not a profile — "I do not know yet" is universal.
 
 ---
 
-### S7 · The "green but wrong" record
+### S7 · The "green but wrong" record — **DONE**
 
 `branch: s7-outcome`
 
