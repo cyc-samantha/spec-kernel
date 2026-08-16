@@ -90,7 +90,7 @@ L2 and L3 exist and work. This repository is the missing front half.
 | **D32** | **A pending model draft survives turns and can be approved only through the named human confirmation route.** The next model turn receives pending drafts but cannot copy one into `answers`; explicit corrections focus only their named pending gap. Model prose never narrates progress; the answer ledger does. *Amended by D33: the route is a spoken one, and a differing value is a human answer rather than a redirected proposal.* |
 | **D33** | **A specification has one entrance: what a person says in the interview.** Accepting a draft is read out of the message, deterministically, before the model is consulted — a translator that could recognise its own approval would be approving its own work (D8), so agreement never reaches it. Recognition stays narrow: a message carrying content falls through to an ordinary turn, where a value the human stated outranks any draft standing in that slot, because discarding it leaves the machine's guess in its place. A draft whose consequence is `authority` is unreachable by a general agreement and must be named (D14). No second route writes to the document — a tick box beside a conversation that keeps asking the same question teaches a requester that answering does nothing. |
 | **D34** | **The translator is told which slots hold a draft, never what the draft says.** Measured on `qwen3.5:2b`: the turn enumerating four column mappings returned one — the mapping the standing draft held — and returned all four with that draft withheld. A drafted value in view is something to copy, and copying is cheaper than reading, so carrying it forward buys nothing and costs the message. The slot name is the whole requirement: enough not to spend a bounded budget redrafting, with nothing to reproduce in place of what the requester said. |
-
+| **D35** | **A value's shape is enforced where it is generated, not refused after it arrives.** The translator was handed a description of the shape and an unconstrained slot to put it in; both local models filled the slot with a self-describing envelope built out of the description. A gap already carries its schema, so the provider format names one variant per offered gap with that schema in place. What a gap does *not* hand the translator matters as much: entitlement, authorship, and the human-facing refusal message were adjacent fields to copy into the value, and both models copied them. |
 ## Known gaps, and what happens to each
 
 | Gap | Decision |
@@ -558,6 +558,34 @@ only visible thing was a question about something else.
 **Done when**: a turn that states a compound value shows what was understood
 and how to accept it, and the title arrives as a draft rather than a question
 asked four times.
+
+---
+
+### S18 · The translator is given a shape, not a description of one — **DONE**
+
+`branch: s18-hand-the-translator-less`
+
+A requester answered "In one line, what should this work be called?" with "data
+mapping tool" and was told they had not answered. Probing both local models
+showed each had answered: `qwen3.5:4b` returned
+`{"kind":"string","value":"data mapping tool"}`, and `:2b` returned the gap's
+own `valueSchema`, Zod refusal string included. Every rule refused the shape,
+the turn dropped it in silence, and the stall counter charged the requester.
+
+- The response format names one variant per offered gap, carrying that gap's
+  own schema where an empty object had been. A shape the runtime enforces
+  during generation cannot be lost and refused afterwards (D35).
+- A gap handed to the translator is reduced to rule, slot, question, and
+  shape. Its entitlement, authorship, and human-facing refusal message were
+  fields to copy into the value, and both models copied them.
+- A candidate its rule refuses is named, with what went wrong. The stall prefix
+  no longer says "That did not answer the question I asked" — the kernel knows
+  the gap is still open, not whose fault that is, and the claim was false
+  exactly when the translation had failed.
+
+**Done when**: the opening description records `intent` and `title` and derives
+`id` in one turn, and no requester is told they failed to answer a question
+they answered.
 
 ---
 
