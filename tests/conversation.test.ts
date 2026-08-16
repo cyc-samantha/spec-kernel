@@ -197,7 +197,7 @@ describe('conversational specification intake', () => {
     expect(result).toEqual(expect.objectContaining({
       status: 'ask',
       missing: expect.objectContaining({ ruleId: 'blocking-decisions-declared' }),
-      prompt: 'That did not answer the question I asked. Which decisions are still open and block this work? An empty list is an answer.',
+      prompt: 'I still do not have a value for this. Which decisions are still open and block this work? An empty list is an answer.',
     }));
   });
 
@@ -355,7 +355,7 @@ describe('conversational specification intake', () => {
     expect(second.state.proposals.map((proposal) => proposal.slot)).toEqual(['intent', 'scope']);
     expect(second.state.messages.at(-1)?.content).toContain('I drafted this from what you said:');
     expect(second.state.messages.at(-1)?.content).toContain('scope = ');
-    expect(second.state.messages.at(-1)?.content).not.toContain('That did not answer');
+    expect(second.state.messages.at(-1)?.content).not.toContain('I still do not have a value');
   });
 
   /*
@@ -410,7 +410,7 @@ describe('conversational specification intake', () => {
     );
 
     expect(result.state.messages.at(-1)?.content).toBe(
-      'That did not answer the question I asked. Which decisions are still open and block this work? An empty list is an answer.',
+      'I still do not have a value for this. Which decisions are still open and block this work? An empty list is an answer.',
     );
   });
 
@@ -772,7 +772,7 @@ describe('conversational specification intake', () => {
       'I could not turn that into scope.',
     );
     expect(result.state.messages.at(-1)?.content).toContain('say "confirm scope"');
-    expect(result.state.messages.at(-1)?.content).not.toContain('That did not answer');
+    expect(result.state.messages.at(-1)?.content).not.toContain('I still do not have a value');
   });
 
   it('refuses a confirmation that names no drafted slot', () => {
@@ -835,6 +835,32 @@ describe('conversational specification intake', () => {
       title: 'Map source columns onto the target schema',
       target: 'example-repository',
     }));
+  });
+
+  /*
+   * A requester answered the title question and was told they had not. The
+   * translator had answered too, with a value the rule refused; the turn dropped
+   * it without a word and the stall counter charged the requester for it.
+   */
+  it('says a value did not fit rather than that the question went unanswered', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['title'];
+
+    const result = await converse(
+      state(draft),
+      project(),
+      'local-user',
+      'data mapping tool',
+      responses({
+        answers: [{ ruleId: 'title-stated', slot: 'title', value: { type: 'string', minLength: 1 } }],
+        proposals: [],
+      }),
+    );
+
+    const said = result.state.messages.at(-1)?.content ?? '';
+    expect(said).toContain('I could not use that as title');
+    expect(said).not.toContain('I still do not have a value');
+    expect(result.state.draft).not.toEqual(expect.objectContaining({ title: expect.anything() }));
   });
 
   it('refuses malformed model output instead of treating it as an answer', async () => {

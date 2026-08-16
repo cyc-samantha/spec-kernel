@@ -62,7 +62,7 @@ describe('the elicit-first path', () => {
     const second = advanceInterview(draft, project(), attempts);
     expect(second).toEqual(expect.objectContaining({
       status: 'ask',
-      prompt: expect.stringContaining('That did not answer the question I asked.'),
+      prompt: expect.stringContaining('I still do not have a value for this.'),
     }));
   });
 
