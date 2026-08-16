@@ -387,6 +387,25 @@ function humanSuppliedAnswers(
   });
 }
 
+/*
+ * Naming a drafted slot tells the requester nothing they can act on: they can
+ * see neither what was understood nor what to do about it, while the next
+ * question is already about something else. Show the value, then the one thing
+ * that takes it.
+ */
+function draftedMessage(drafted: readonly SlotProposal[]): string {
+  const shown = drafted.map((item) => `  ${item.slot} = ${JSON.stringify(item.value)}`).join('\n');
+  return `I drafted this from what you said:\n${shown}\n${howToAccept(drafted)}`;
+}
+
+function howToAccept(drafted: readonly SlotProposal[]): string {
+  const granting = drafted.filter((item) => item.consequence === 'authority');
+  if (granting.length === 0) return 'Say "yes" to take it, or tell me what to change.';
+  const named = granting.map((item) => `"confirm ${item.slot}"`).join(', ');
+  const others = drafted.length > granting.length ? ' "yes" takes the others.' : '';
+  return `Say ${named} to grant that — a general yes cannot.${others} Or tell me what to change.`;
+}
+
 /** The ledger narrates progress; model prose cannot claim writes that did not happen. */
 function progressMessage(
   beforeAnswerCount: number,
@@ -398,12 +417,11 @@ function progressMessage(
   const derived = recorded.filter((answer) => answer.source === 'derived').map((answer) => answer.slot);
   const prior = new Map(beforeProposals.map((proposal) => [gapKey(proposal), proposal]));
   const drafted = state.proposals
-    .filter((proposal) => !sameProposal(prior.get(gapKey(proposal)), proposal))
-    .map((proposal) => proposal.slot);
+    .filter((proposal) => !sameProposal(prior.get(gapKey(proposal)), proposal));
   return [
     human.length > 0 ? `I recorded ${human.join(', ')}.` : '',
     derived.length > 0 ? `I derived ${derived.join(', ')}.` : '',
-    drafted.length > 0 ? `Drafts awaiting your confirmation: ${drafted.join(', ')}.` : '',
+    drafted.length > 0 ? draftedMessage(drafted) : '',
   ].filter(Boolean).join(' ');
 }
 
