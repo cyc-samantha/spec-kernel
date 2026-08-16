@@ -1,6 +1,7 @@
 import { interviewState } from './answers.ts';
 import { sealCheck, type MissingItem } from './seal-check.ts';
 import { specificationSchema, type Specification } from './specification.ts';
+import type { Entitlement } from './rules.ts';
 import type { ProjectDeclaration } from '../ports/project.ts';
 
 export interface InterviewAttempt {
@@ -48,24 +49,24 @@ export function advanceInterview(
   draft: unknown,
   project: ProjectDeclaration,
   attempts: readonly InterviewAttempt[] = [],
+  answeringAs: Entitlement = 'requester',
 ): InterviewStep {
   const missing = sealCheck(draft);
   if (missing.some((item) => item.message.includes('could not be evaluated'))) {
     return { status: 'refused', reason: 'the draft could not be evaluated safely' };
   }
 
-  const state = interviewState(missing);
-  if (state.status === 'sealed') {
+  if (missing.length === 0) {
     const parsed = specificationSchema.safeParse(draft);
     if (!parsed.success) return { status: 'refused', reason: 'the sealed draft does not parse' };
     return { status: 'sealed', successful: true, specification: parsed.data };
   }
-  if (state.status === 'awaiting_technical_completion') {
-    return { ...state, missing };
+  const next = missing.find((item) => item.entitlement === answeringAs);
+  if (!next) {
+    const state = interviewState(missing);
+    if (state.status === 'awaiting_technical_completion') return { ...state, missing };
+    return { status: 'refused', reason: 'no entitled next question could be selected' };
   }
-
-  const next = missing.find((item) => item.entitlement === 'requester');
-  if (!next) return { status: 'refused', reason: 'no entitled next question could be selected' };
   const stalls = consecutiveStalls(attempts, next);
   if (stalls >= 2) {
     return {
@@ -73,7 +74,7 @@ export function advanceInterview(
       decision: {
         id: decisionId(next),
         question: next.question,
-        owner: project.slot_entitlements.requester[0]!,
+        owner: project.slot_entitlements[answeringAs][0]!,
         deferred: false,
       },
     };
