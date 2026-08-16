@@ -46,6 +46,18 @@ export interface ModelPort {
   complete(request: ModelRequest): Promise<unknown>;
 }
 
+export type ModelPortFailure = 'unavailable' | 'invalid_response';
+
+export class ModelPortError extends Error {
+  readonly failure: ModelPortFailure;
+
+  constructor(failure: ModelPortFailure, message: string) {
+    super(message);
+    this.name = 'ModelPortError';
+    this.failure = failure;
+  }
+}
+
 /** Validates an untrusted adapter response without allowing parse errors through. */
 export function loadModelProposal(value: unknown): ModelProposalLoad {
   try {

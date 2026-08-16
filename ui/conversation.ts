@@ -6,6 +6,7 @@ import type { ProjectDeclaration } from '../ports/project.ts';
 import {
   conversationMessageSchema,
   loadModelProposal,
+  ModelPortError,
   type ConversationMessage,
   type ModelPort,
 } from '../ports/model.ts';
@@ -147,8 +148,11 @@ export async function converse(
     let raw: unknown;
     try {
       raw = await model.complete({ messages: current.messages, draft: current.draft, missing: step.missing });
-    } catch {
-      return { status: 'refused', state: current, reason: 'the configured model is unavailable' };
+    } catch (error) {
+      const reason = error instanceof ModelPortError && error.failure === 'invalid_response'
+        ? 'the configured model returned an invalid response'
+        : 'the configured model is unavailable';
+      return { status: 'refused', state: current, reason };
     }
     const loaded = loadModelProposal(raw);
     if (!loaded.ok) return { status: 'refused', state: current, reason: loaded.reason };
