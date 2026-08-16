@@ -230,7 +230,7 @@ kernel would already be shaped by whichever project came first.
 
 ---
 
-### S4 · The engineer door — assert-first
+### S4 · The engineer door — assert-first — **DONE**
 
 `branch: s4-draft`
 

@@ -35,6 +35,9 @@ const PROJECT_NAMES = ['factory-map', 'algo-trading', 'ticket-system', 'lite-har
  */
 const DOMAIN_WORDS = ['refund', 'payment', 'invoice', 'trading', 'portfolio', 'ticket', 'sprint'];
 
+/** Runtime policy is independent of whichever model vendor packages the workflow. */
+const VENDOR_NAMES = ['anthropic', 'claude', 'openai', 'codex'];
+
 async function kernelSources(): Promise<{ name: string; text: string }[]> {
   const names = (await readdir(KERNEL)).filter((name) => name.endsWith('.ts'));
   return Promise.all(
@@ -66,6 +69,23 @@ describe('kernel purity', () => {
   it('never hardcodes a host to talk to', async () => {
     const offenders = (await kernelSources())
       .filter(({ text }) => /https?:\/\/(?!\S*example)/.test(text))
+      .map(({ name }) => name);
+    expect(offenders).toEqual([]);
+  });
+
+  it('never knows which model vendor packages the workflow', async () => {
+    const offenders = (await kernelSources()).flatMap(({ name, text }) =>
+      VENDOR_NAMES.filter((vendor) => new RegExp(`\\b${vendor}\\b`, 'i').test(text)).map(
+        (vendor) => `${name}: ${vendor}`,
+      ),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('never branches on which entry path supplied the specification', async () => {
+    const entryPathTerms = [/\bdoor\b/i, /\bentry[_A-Z]?point\b/i, /\bengineer\b/i, /\bnon[-_ ]technical\b/i];
+    const offenders = (await kernelSources())
+      .filter(({ text }) => entryPathTerms.some((term) => term.test(text)))
       .map(({ name }) => name);
     expect(offenders).toEqual([]);
   });

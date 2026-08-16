@@ -1,0 +1,39 @@
+{
+  "id": "WC-EXAMPLE-01",
+  "title": "Reject an unsupported export field",
+  "target": "example/repository",
+  "scope": {
+    "include": ["src/export/**"],
+    "exclude": ["src/export/legacy/**"]
+  },
+  "constraints": ["preserve the existing wire format"],
+  "acceptance": [
+    {
+      "id": "AC-01",
+      "text": "A requester can observe that unsupported fields are rejected",
+      "verification": "human_review",
+      "provenance": "human_authored"
+    },
+    {
+      "id": "AC-02",
+      "text": "The named rejection test passes",
+      "verification": "executable_test",
+      "targetTest": {
+        "file": "tests/export.test.ts",
+        "name": "rejects unsupported fields"
+      },
+      "provenance": "derived",
+      "derivedFrom": "AC-01"
+    }
+  ],
+  "context": [],
+  "authority": {
+    "allowed": ["edit implementation", "add tests"],
+    "requiresHuman": [],
+    "automationLevel": "agent-with-review"
+  },
+  "irreversibility": "refactor",
+  "risk": "low",
+  "dependsOn": [],
+  "blockingDecisions": []
+}

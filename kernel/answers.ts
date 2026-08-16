@@ -87,7 +87,7 @@ export type InterviewState =
   | { status: 'awaiting_technical_completion'; successful: true }
   | { status: 'in_progress'; successful: false };
 
-/** The requester door succeeds when nothing requester-owned remains to ask. */
+/** Requester-led collection succeeds when nothing requester-owned remains to ask. */
 export function interviewState(
   missing: readonly Pick<MissingItem, 'entitlement'>[],
 ): InterviewState {

@@ -22,5 +22,5 @@
 
     "skipLibCheck": true
   },
-  "include": ["kernel", "ports", "tests"]
+  "include": ["bin", "kernel", "ports", "tests"]
 }
