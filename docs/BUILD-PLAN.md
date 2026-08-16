@@ -89,6 +89,7 @@ L2 and L3 exist and work. This repository is the missing front half.
 | **D31** | **The parent intent a split traces to is derived from the sealed document, never re-elicited, and splitting is a capability a deployment may not have.** Re-asking for the parent would restart the authorship chain at whoever happens to be dividing the work (D22). `SplitPort` is separate from `ModelPort` so a deployment that only elicits one bounded change need not implement it — and one that cannot split refuses the route rather than sourcing a division from somewhere else. |
 | **D32** | **A pending model draft survives turns and can be approved only through the named human confirmation route.** The next model turn receives pending drafts but cannot copy one into `answers`; explicit corrections focus only their named pending gap. Model prose never narrates progress; the answer ledger does. *Amended by D33: the route is a spoken one, and a differing value is a human answer rather than a redirected proposal.* |
 | **D33** | **A specification has one entrance: what a person says in the interview.** Accepting a draft is read out of the message, deterministically, before the model is consulted — a translator that could recognise its own approval would be approving its own work (D8), so agreement never reaches it. Recognition stays narrow: a message carrying content falls through to an ordinary turn, where a value the human stated outranks any draft standing in that slot, because discarding it leaves the machine's guess in its place. A draft whose consequence is `authority` is unreachable by a general agreement and must be named (D14). No second route writes to the document — a tick box beside a conversation that keeps asking the same question teaches a requester that answering does nothing. |
+| **D34** | **The translator is told which slots hold a draft, never what the draft says.** Measured on `qwen3.5:2b`: the turn enumerating four column mappings returned one — the mapping the standing draft held — and returned all four with that draft withheld. A drafted value in view is something to copy, and copying is cheaper than reading, so carrying it forward buys nothing and costs the message. The slot name is the whole requirement: enough not to spend a bounded budget redrafting, with nothing to reproduce in place of what the requester said. |
 
 ## Known gaps, and what happens to each
 
@@ -523,6 +524,8 @@ unrelated question.
   to an ordinary turn. An `authority` draft needs its own name (D14).
 - The drafts card reports what was guessed and why. The tick box, the JSON
   editor, and `POST /api/conversation/confirm` are gone, leaving one entrance.
+- The translator receives the names of drafted slots, not their values. Holding
+  the draft in its view was what made it answer with the draft (D34).
 
 **Done when**: the live four-mapping turn records all four in `scope` as the
 requester's own answer, and a requester who only ever types can move every
