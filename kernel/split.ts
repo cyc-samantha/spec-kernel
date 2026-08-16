@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { specificationSchema } from './specification.ts';
+
 const nonBlank = z.string().trim().min(1);
 
 export const parentIntentSchema = z.object({
@@ -28,7 +30,35 @@ export const splitProposalSchema = z.discriminatedUnion('verdict', [
 ]);
 
 export type ParentIntent = z.infer<typeof parentIntentSchema>;
+export type ProposedContract = z.infer<typeof proposedContractSchema>;
 export type SplitProposal = z.infer<typeof splitProposalSchema>;
+
+export type ParentIntentDerivation =
+  | { ok: true; intent: ParentIntent }
+  | { ok: false; problems: string[] };
+
+/**
+ * Derives the parent a sealed document's contracts will trace back to. The
+ * author is named by the caller because the document records who answered, not
+ * who is splitting it (D22); every criterion inherits the document's one target
+ * (D21), so a split can only redistribute work, never retarget it.
+ */
+export function parentIntentFrom(specification: unknown, authoredBy: string): ParentIntentDerivation {
+  const sealed = specificationSchema.safeParse(specification);
+  if (!sealed.success) return { ok: false, problems: ['the document is not a sealed specification'] };
+  const candidate = parentIntentSchema.safeParse({
+    id: sealed.data.id,
+    title: sealed.data.title,
+    authored_by: authoredBy,
+    criteria: sealed.data.acceptance.map((criterion) => ({
+      id: criterion.id,
+      text: criterion.text,
+      target: sealed.data.target,
+    })),
+  });
+  if (!candidate.success) return { ok: false, problems: ['the parent intent is incomplete'] };
+  return { ok: true, intent: candidate.data };
+}
 
 export type SplitValidation =
   | { ok: true; status: 'proposed'; proposal: SplitProposal }

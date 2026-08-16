@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateSplitProposal, type ParentIntent } from '../kernel/split.ts';
+import { parentIntentFrom, validateSplitProposal, type ParentIntent } from '../kernel/split.ts';
+import { validSpecification } from './fixtures/valid-specification.ts';
 
 function intent(criteria: ParentIntent['criteria']): ParentIntent {
   return { id: 'INT-01', title: 'Bounded intent', authored_by: 'requester', criteria };
@@ -121,5 +122,60 @@ describe('split proposals', () => {
     const result = validateSplitProposal(null, null);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.problems).not.toHaveLength(0);
+  });
+});
+
+describe('the parent intent a sealed specification becomes', () => {
+  /*
+   * D22: a contract traces to a human intent by named authorship. The parent is
+   * derived from the sealed document, never re-elicited, or the chain would
+   * start again from whoever happened to be at the keyboard.
+   */
+  it('carries the sealed identity, title, author, and every criterion', () => {
+    const specification = validSpecification();
+    const intent = parentIntentFrom(specification, 'sam');
+
+    expect(intent).toEqual({
+      ok: true,
+      intent: {
+        id: specification.id,
+        title: specification.title,
+        authored_by: 'sam',
+        criteria: specification.acceptance.map((criterion) => ({
+          id: criterion.id,
+          text: criterion.text,
+          target: specification.target,
+        })),
+      },
+    });
+  });
+
+  it('feeds a split proposal the validator then admits', () => {
+    const specification = validSpecification();
+    const derived = parentIntentFrom(specification, 'sam');
+    if (!derived.ok) throw new Error('expected a parent intent');
+    const [first, ...rest] = specification.acceptance;
+
+    const result = validateSplitProposal(derived.intent, {
+      verdict: 'split',
+      because: 'the two criteria do not depend on each other',
+      contracts: [
+        {
+          id: 'WC-A', title: 'A', target: specification.target,
+          source_intent: specification.id, criteria: [first!.id], after: [],
+        },
+        {
+          id: 'WC-B', title: 'B', target: specification.target,
+          source_intent: specification.id, criteria: rest.map((c) => c.id), after: ['WC-A'],
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('refuses a document it cannot read rather than inventing an author', () => {
+    expect(parentIntentFrom(null, 'sam').ok).toBe(false);
+    expect(parentIntentFrom(validSpecification(), '  ').ok).toBe(false);
   });
 });

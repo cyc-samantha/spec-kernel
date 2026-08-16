@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { MissingItem } from '../kernel/seal-check.ts';
+import type { ParentIntent } from '../kernel/split.ts';
 
 const nonBlank = z.string().trim().min(1);
 
@@ -66,6 +67,19 @@ export type ModelProposalLoad =
 /** The only model capability the application layer consumes. */
 export interface ModelPort {
   complete(request: ModelRequest): Promise<unknown>;
+}
+
+/*
+ * Splitting is a separate capability, not a bigger ModelPort: a deployment that
+ * only ever elicits one bounded change should not have to implement it, and the
+ * verdict it returns is adjudicated by kernel/split.ts either way.
+ */
+export interface SplitRequest {
+  intent: ParentIntent;
+}
+
+export interface SplitPort {
+  splitIntent(request: SplitRequest): Promise<unknown>;
 }
 
 export type ModelPortFailure = 'unavailable' | 'invalid_response' | 'timed_out' | 'context_exceeded';

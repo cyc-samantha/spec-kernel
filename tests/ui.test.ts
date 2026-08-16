@@ -262,3 +262,91 @@ describe('checked-in UI source', () => {
     expect(html).not.toMatch(/https?:\/\//);
   });
 });
+
+describe('splitting a sealed session into claimable contracts', () => {
+  async function sealedSession(splitReply: unknown): Promise<string> {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    await bind({
+      initialDraft: draft,
+      modelLabel: 'Test model',
+      model: {
+        complete: async () => ({
+          assistantMessage: 'Recorded.',
+          answers: [{ ruleId: 'blocking-decisions-declared', slot: 'blockingDecisions', value: [] }],
+          proposals: [],
+        }),
+        splitIntent: async () => splitReply,
+      },
+    });
+    const started = await post('/api/conversation/start', {});
+    const { sessionId } = await started.json() as { sessionId: string };
+    await post('/api/conversation/turn', { sessionId, message: 'There are no blocking decisions.' });
+    return sessionId;
+  }
+
+  it('returns contracts that carry every criterion of the sealed document', async () => {
+    const specification = validSpecification();
+    const [first, ...rest] = specification.acceptance;
+    const sessionId = await sealedSession({
+      verdict: 'split',
+      because: 'neither slice waits on the other',
+      contracts: [
+        {
+          id: 'WC-A', title: 'First', target: specification.target,
+          source_intent: specification.id, criteria: [first!.id], after: [],
+        },
+        {
+          id: 'WC-B', title: 'Second', target: specification.target,
+          source_intent: specification.id, criteria: rest.map((c) => c.id), after: ['WC-A'],
+        },
+      ],
+    });
+
+    const response = await post('/api/conversation/split', { sessionId });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      status: 'split',
+      contracts: [
+        expect.objectContaining({ id: 'WC-A' }),
+        expect.objectContaining({ id: 'WC-B', after: ['WC-A'] }),
+      ],
+    }));
+  });
+
+  /*
+   * Fail-closed: a deployment whose adapter cannot split must not receive a
+   * division from somewhere else.
+   */
+  it('refuses to split when the configured runtime has no split capability', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    await bind({ initialDraft: draft, model: { complete: async () => ({}) } });
+    const started = await post('/api/conversation/start', {});
+    const { sessionId } = await started.json() as { sessionId: string };
+
+    const response = await post('/api/conversation/split', { sessionId });
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({ error: 'split_unsupported' });
+  });
+
+  it('refuses to split a session that has not sealed', async () => {
+    const draft = validSpecification() as unknown as Record<string, unknown>;
+    delete draft['blockingDecisions'];
+    await bind({
+      initialDraft: draft,
+      model: { complete: async () => ({}), splitIntent: async () => ({ verdict: 'keep', because: 'x' }) },
+    });
+    const started = await post('/api/conversation/start', {});
+    const { sessionId } = await started.json() as { sessionId: string };
+
+    const response = await post('/api/conversation/split', { sessionId });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({ status: 'refused' }));
+  });
+
+  it('refuses an unknown session', async () => {
+    await bind({ model: { complete: async () => ({}), splitIntent: async () => ({}) } });
+    const response = await post('/api/conversation/split', { sessionId: 'not-a-session' });
+    expect(response.status).toBe(404);
+  });
+});

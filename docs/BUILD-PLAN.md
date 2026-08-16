@@ -86,6 +86,7 @@ L2 and L3 exist and work. This repository is the missing front half.
 | **D28** | **A gap with a draft on offer is asked as a confirmation, and a draft the requester has not seen counts as progress under D10.** Otherwise the interview argues with its own suggestion: it shows a drafted value and in the same breath complains the question went unanswered, then declares a blocking decision over a slot it has already filled. The same draft a second time is *not* progress — an ignored suggestion must not keep an interview alive forever. |
 | **D29** | **The interviewer's prose is carried only when the ledger backs it.** A model summary is dropped unless the turn recorded an answer or kept a draft, and a confirmation names the slots it wrote. A requester cannot distinguish a fluent summary from a result, so an unbacked summary is a claim of progress the document does not support (D22). |
 | **D30** | **A model adapter declares its context window and refuses a reply that overran it.** A local runtime whose window cannot hold the prompt does not fail — it discards the oldest tokens, which are the instructions, and answers HTTP 200 anyway. The reply is fluent and grounded in nothing. Inheriting the runtime's default window is therefore a fail-open on the one input the kernel cannot re-derive: what the requester actually said. |
+| **D31** | **The parent intent a split traces to is derived from the sealed document, never re-elicited, and splitting is a capability a deployment may not have.** Re-asking for the parent would restart the authorship chain at whoever happens to be dividing the work (D22). `SplitPort` is separate from `ModelPort` so a deployment that only elicits one bounded change need not implement it — and one that cannot split refuses the route rather than sourcing a division from somewhere else. |
 
 ## Known gaps, and what happens to each
 
@@ -439,6 +440,33 @@ nothing.
 **Done when**: a conversation that outgrows the window stops the interview with
 a message naming the window, and never with a translation of a prompt the
 runtime discarded.
+
+---
+
+### S14 · A sealed intent becomes claimable tickets — **DONE**
+
+`branch: s14-sealed-intent-splits`
+
+S8 built the split validator and connected it to nothing but a CLI. A sealed
+specification was the end of the road: correct, and still one undivided lump for
+the execution layer to receive.
+
+- `parentIntentFrom` derives the parent from the sealed document — its id,
+  title, and every criterion, each inheriting the document's one target (D21).
+  The author is named by the caller, so the chain continues rather than
+  restarting at whoever is dividing the work (D31).
+- `SplitPort` is separate from `ModelPort`. Both capabilities share one request
+  path in the adapter, so the S13 window gate cannot be true of one and not the
+  other.
+- `proposeSplit` asks for a division and lets `validateSplitProposal` admit it.
+  A division that drops a criterion, assigns one twice, or names a contract that
+  does not trace to the parent is refused, never repaired.
+- `POST /api/conversation/split` refuses outright when the configured adapter
+  has no split capability.
+
+**Done when**: a sealed session returns either contracts that carry every
+criterion of the document, each tracing to it, or a reasoned verdict that the
+work is already one contract.
 
 ---
 

@@ -61,6 +61,19 @@
           <p class="proposal-note">Values that decide what an Agent may do unsupervised start unticked. Nobody can grant that on your behalf.</p>
         </section>
 
+        <section id="ticket-card" class="proposal-card" aria-labelledby="ticket-title" hidden>
+          <div class="proposal-heading">
+            <div>
+              <p class="eyebrow">READY FOR THE EXECUTION LAYER</p>
+              <h3 id="ticket-title">Break this into contracts an Agent team can claim.</h3>
+            </div>
+            <button id="split-spec" class="button primary" type="button">Break into tickets</button>
+          </div>
+          <p id="ticket-summary" class="proposal-note"></p>
+          <ol id="ticket-list" class="proposal-list"></ol>
+          <button id="download-tickets" class="text-button" type="button" hidden>Download tickets</button>
+        </section>
+
         <form id="composer" class="composer">
           <label class="sr-only" for="intent-input">Your answer</label>
           <textarea id="intent-input" rows="3" maxlength="20000" placeholder="For example: I need customers to export their invoices as CSV…" required></textarea>

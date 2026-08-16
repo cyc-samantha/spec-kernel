@@ -1,4 +1,10 @@
-import { ModelPortError, type ModelPort, type ModelRequest } from '../ports/model.ts';
+import {
+  ModelPortError,
+  type ModelPort,
+  type ModelRequest,
+  type SplitPort,
+  type SplitRequest,
+} from '../ports/model.ts';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:11434';
 const DEFAULT_TIMEOUT_MS = 300_000;
@@ -41,6 +47,45 @@ const proposalFormat = {
   required: ['assistantMessage', 'answers', 'proposals'],
   additionalProperties: false,
 } as const;
+
+const splitFormat = {
+  type: 'object',
+  properties: {
+    verdict: { type: 'string', enum: ['keep', 'split'] },
+    because: { type: 'string', minLength: 1 },
+    contracts: {
+      type: 'array',
+      maxItems: 32,
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', minLength: 1 },
+          title: { type: 'string', minLength: 1 },
+          target: { type: 'string', minLength: 1 },
+          source_intent: { type: 'string', minLength: 1 },
+          criteria: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
+          after: { type: 'array', items: { type: 'string', minLength: 1 } },
+        },
+        required: ['id', 'title', 'target', 'source_intent', 'criteria', 'after'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['verdict', 'because'],
+  additionalProperties: false,
+} as const;
+
+const splitPrompt = `You divide one sealed intent into the smallest number of contracts an Agent team can claim.
+
+The test is dependence, not count. Criteria that must land together stay together; split only where
+one part can be built, reviewed, and merged without waiting for another.
+
+verdict "keep": the work is already one contract. Say why in "because".
+verdict "split": return at least two contracts. Every criterion of the parent is assigned to exactly
+one contract, every contract copies the parent's id into source_intent and the criterion's target
+into target, contract ids are unique, and "after" names only other contracts in this same list.
+Use "after" for real ordering; leave it empty when the contracts are independent.
+Never invent a criterion, a repository, or an identifier the parent intent does not contain.`;
 
 const systemPrompt = `You turn a human conversation into structured values for deterministic Rule gaps.
 Each supplied gap carries its own question and its own valueSchema. Copy its ruleId and slot exactly.
@@ -115,8 +160,23 @@ async function responseText(response: Response): Promise<string> {
   return text;
 }
 
+function structuredContent(envelope: Record<string, unknown>): unknown {
+  const message = envelope['message'];
+  const content = typeof message === 'object' && message !== null
+    ? (message as Record<string, unknown>)['content']
+    : undefined;
+  if (typeof content !== 'string') {
+    throw new ModelPortError('invalid_response', 'the model runtime returned no message content');
+  }
+  try {
+    return JSON.parse(content) as unknown;
+  } catch {
+    throw new ModelPortError('invalid_response', 'the model message was not structured JSON');
+  }
+}
+
 /** Provider adapter only: it translates the neutral port to Ollama's local API. */
-export class OllamaAdapter implements ModelPort {
+export class OllamaAdapter implements ModelPort, SplitPort {
   readonly #endpoint: URL;
   readonly #model: string;
   readonly #timeoutMs: number;
@@ -138,9 +198,33 @@ export class OllamaAdapter implements ModelPort {
   }
 
   async complete(request: ModelRequest): Promise<unknown> {
-    let response: Response;
+    return this.#ask(proposalFormat, [
+      { role: 'system', content: systemPrompt },
+      ...request.messages,
+      { role: 'system', content: JSON.stringify({ currentDraft: request.draft, gaps: request.missing }) },
+    ]);
+  }
+
+  async splitIntent(request: SplitRequest): Promise<unknown> {
+    return this.#ask(splitFormat, [
+      { role: 'system', content: splitPrompt },
+      { role: 'user', content: JSON.stringify({ parentIntent: request.intent }) },
+    ]);
+  }
+
+  async #ask(format: unknown, messages: readonly { role: string; content: string }[]): Promise<unknown> {
+    const response = await this.#post(format, messages);
+    if (!response.ok) {
+      throw new ModelPortError('unavailable', `the model runtime returned HTTP ${response.status}`);
+    }
+    const envelope = await this.#envelope(response);
+    assertReplyFitsWindow(envelope, this.#contextTokens, this.#maxOutputTokens);
+    return structuredContent(envelope);
+  }
+
+  async #post(format: unknown, messages: readonly { role: string; content: string }[]): Promise<Response> {
     try {
-      response = await this.#fetch(this.#endpoint, {
+      return await this.#fetch(this.#endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         signal: AbortSignal.timeout(this.#timeoutMs),
@@ -149,16 +233,9 @@ export class OllamaAdapter implements ModelPort {
           stream: false,
           think: false,
           keep_alive: DEFAULT_KEEP_ALIVE,
-          format: proposalFormat,
+          format,
           options: { temperature: 0, num_predict: this.#maxOutputTokens, num_ctx: this.#contextTokens },
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...request.messages,
-            {
-              role: 'system',
-              content: JSON.stringify({ currentDraft: request.draft, gaps: request.missing }),
-            },
-          ],
+          messages,
         }),
       });
     } catch (error) {
@@ -168,33 +245,19 @@ export class OllamaAdapter implements ModelPort {
       }
       throw new ModelPortError('unavailable', 'the model runtime could not be reached');
     }
+  }
 
-    if (!response.ok) {
-      throw new ModelPortError('unavailable', `the model runtime returned HTTP ${response.status}`);
-    }
-
-    let envelope: unknown;
+  async #envelope(response: Response): Promise<Record<string, unknown>> {
+    let parsed: unknown;
     try {
-      envelope = JSON.parse(await responseText(response)) as unknown;
+      parsed = JSON.parse(await responseText(response)) as unknown;
     } catch (error) {
       if (error instanceof ModelPortError) throw error;
       throw new ModelPortError('invalid_response', 'the model runtime returned invalid JSON');
     }
-    if (typeof envelope !== 'object' || envelope === null) {
+    if (typeof parsed !== 'object' || parsed === null) {
       throw new ModelPortError('invalid_response', 'the model runtime returned an invalid envelope');
     }
-    assertReplyFitsWindow(envelope as Record<string, unknown>, this.#contextTokens, this.#maxOutputTokens);
-    const message = (envelope as Record<string, unknown>)['message'];
-    const content = typeof message === 'object' && message !== null
-      ? (message as Record<string, unknown>)['content']
-      : undefined;
-    if (typeof content !== 'string') {
-      throw new ModelPortError('invalid_response', 'the model runtime returned no message content');
-    }
-    try {
-      return JSON.parse(content) as unknown;
-    } catch {
-      throw new ModelPortError('invalid_response', 'the model message was not structured JSON');
-    }
+    return parsed as Record<string, unknown>;
   }
 }
