@@ -1,3 +1,4 @@
+import type { MissingItem } from '../kernel/seal-check.ts';
 import {
   ModelPortError,
   type ModelPort,
@@ -173,6 +174,18 @@ async function responseText(response: Response): Promise<string> {
   return text;
 }
 
+/*
+ * Every field beside the value is one the translator can copy into it, and both
+ * local models measured did: 2b answered the title question with the gap's own
+ * valueSchema, Zod refusal string and all. A gap is reduced to what translating
+ * it requires — who may fill it and why it was refused are the application's
+ * concerns, not a translation's.
+ */
+function translatable(gap: MissingItem): Record<string, unknown> {
+  const { $schema: _dropped, ...shape } = (gap.valueSchema ?? {}) as Record<string, unknown>;
+  return { ruleId: gap.ruleId, slot: gap.slot, question: gap.question, valueSchema: shape };
+}
+
 function structuredContent(envelope: Record<string, unknown>): unknown {
   const message = envelope['message'];
   const content = typeof message === 'object' && message !== null
@@ -219,8 +232,8 @@ export class OllamaAdapter implements ModelPort, SplitPort {
         content: JSON.stringify({
           currentDraft: request.draft,
           slotsAlreadyDrafted: request.drafted,
-          focusGap: request.focus,
-          gaps: request.missing,
+          focusGap: translatable(request.focus),
+          gaps: request.missing.map(translatable),
         }),
       },
     ]);

@@ -94,6 +94,25 @@ describe('Ollama model adapter', () => {
     expect(JSON.stringify(body['format'])).not.toContain('assistantMessage');
   });
 
+  /*
+   * Measured on qwen3.5:2b and :4b answering "data mapping tool" to the title
+   * question: both returned a title whose value was the gap's own neighbouring
+   * fields — 2b returned the valueSchema itself, Zod refusal string included.
+   * A gap carrying eight fields invites the translator to merge them.
+   */
+  it('hands the translator only what a translation needs from a gap', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(reply({}));
+    await new OllamaAdapter({ model: 'local-model', fetch: fetchMock }).complete(request());
+    const body = String(fetchMock.mock.calls[0]![1]?.body);
+
+    expect(body).toContain('blocking-decisions-declared');
+    expect(body).toContain('Which decisions are still open');
+    expect(body).toContain('valueSchema');
+    expect(body).not.toContain('blockingDecisions must be explicitly declared');
+    expect(body).not.toContain('human_confirms');
+    expect(body).not.toContain('$schema');
+  });
+
   it('refuses an unavailable runtime', async () => {
     const adapter = new OllamaAdapter({
       model: 'local-model',
