@@ -551,6 +551,9 @@ only visible thing was a question about something else.
 - `title-stated` asks "In one line, what should this work be called?". The
   previous wording made "one line" the subject of "names"; every sibling
   question is ordinary word order, and this one read as a riddle.
+- Agreement with nothing pending is read as itself. It had been sent to the
+  translator, which cost an inference to learn nothing and recorded a stalled
+  attempt against a question the requester never declined.
 
 **Done when**: a turn that states a compound value shows what was understood
 and how to accept it, and the title arrives as a draft rather than a question
