@@ -22,7 +22,7 @@ takes, who may fill which slot, and every verdict. **1a authors, 1b adjudicates 
 nothing here writes a specification** (`docs/BUILD-PLAN.md` § D36).
 
 What it adjudicates is **two documents** (§ D37): a *human spec* — intent,
-outcome, and acceptance claims a person can read — and a *technical spec* —
+outcome, metric, and acceptance claims a person can read — and a *technical spec* —
 target, scope, context, and the executable criteria that prove them. The human
 spec is verified by sign-off, the technical spec by not having drifted from what
 was signed. Both, or neither (§ D38). `risk`, `irreversibility`, and `authority`

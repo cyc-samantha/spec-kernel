@@ -116,30 +116,25 @@ carries the reasoning that led here and the two-repository resolution D36 retire
 | # | Decision |
 |---|---|
 | **D36** | **1a is an agent; 1b is this repository. 1a authors, 1b adjudicates.** The interview and both documents it produces are an agent's work in a session: it elicits the human spec from a requester and writes the technical spec itself, because that is a task an agent does. This repository writes nothing. It defines the rule set, the shape of each document, who may fill which slot, and every verdict; the agent calls `bin/` to learn what is missing and whether it is done. There is therefore no `spec-intake` repository and no `ports/model.ts` — the model is 1b's caller, not its dependency, and an adapter in this tree would be a second, weaker interviewer competing with the one that already has the context. Retires the two-repository resolution in `docs/L1-REARCHITECTURE-TRIAGE.md`, and with it D24, D25, D30, D34, and D35: those bind whatever conducts the interview, which is not code here. |
-| **D37** | **A specification is two documents, not one, and 1a writes both.** The **human spec** is what the requester wants, why, and how they will know it worked: intent, outcome, and acceptance claims a person can read. The **technical spec** is how it gets built and how a machine proves it: target, scope, context, constraints, and executable criteria. A requester is never asked to author the second. **`risk`, `irreversibility`, and `authority` are human-spec slots**, without exception: they decide how much damage an agent may do unsupervised (D27), and the agent writes the technical half — put them there and it grants itself its own blast radius, with D27 left as a rule with nothing behind it. `awaiting_technical_completion` (D16) stops being an interview state and becomes the boundary between the two documents. |
+| **D37** | **A specification is two documents, not one, and 1a writes both.** The **human spec** is what the requester wants, why, and how they will know it worked: intent, outcome, metric, and acceptance claims a person can read. The **technical spec** is how it gets built and how a machine proves it: target, scope, context, constraints, and executable criteria. A requester is never asked to author the second. **`risk`, `irreversibility`, and `authority` are human-spec slots**, without exception: they decide how much damage an agent may do unsupervised (D27), and the agent writes the technical half — put them there and it grants itself its own blast radius, with D27 left as a rule with nothing behind it. `awaiting_technical_completion` (D16) stops being an interview state and becomes the boundary between the two documents. |
 | **D38** | **Each half is verified by a different question, and both are required.** The human spec is verified by **sign-off**: a named, entitled human says this is what they want. The technical spec is verified by **no drift**: every human claim still has technical criteria tracing to the exact text that was signed. A signed human spec beside a drifted technical spec is not partially ready — it is refused. Two verdicts, one gate. |
 | **D39** | **`derivedFrom` carries the parent's content hash, not only its id.** An id survives an edit to the thing it names, so revising a human criterion leaves its derived tests pointing at it and silently stale: all green, proving something nobody is asking for any more. The hash turns drift into a fact a program checks instead of a thing a reviewer must notice. This is `context[].contentSha` — already in the schema — applied to the one link that carries authorship. Extends D18; it is the mechanism D38's second verdict runs on. |
-| **D40** | **An outcome or a metric is not an acceptance criterion.** "Churn drops five percent" cannot produce evidence inside a branch, so D19 refuses it and `evidence-producible` is right to. But it is the reason the work was asked for, and a specification that drops it records what was built and never what it was for. Outcome and metric are their own slots: no verification mechanism, gating nothing, refusing nothing. They exist to be the ruler the outcome record (S7) is read against — which is what turns "all criteria green, still wrong" from an anecdote into an answerable question. |
+| **D40** | **An outcome and a metric are not acceptance criteria. The metric gates its own presence, never its achievement.** "Churn drops five percent" cannot produce evidence inside a branch, so D19 refuses it as a criterion and `evidence-producible` is right to. But the metric is the evidence that the work was worth doing at all, and **it only means that if it was named before the work started** — a metric chosen afterwards is chosen to flatter the result, and reads as evidence while being its opposite. So: `outcome` says what the work is for; `metric` is the predefined data that would settle whether it happened. Neither carries a verification mechanism and no rule asks either to name a test. But a seal without a metric is refused, exactly as an absent `blockingDecisions` key is refused — "we said in advance what would make this worth doing" and "nobody said" are different documents, and only one of them can be judged later. They are the ruler S7's outcome record is read against, which is what turns "all criteria green, still wrong" from an anecdote into an answerable question. Because both are human-spec slots covered by the sign-off, D39 already makes editing one after the fact a drift that must be re-signed. |
 | **D41** | **A wrong outcome versions the human spec, not the technical one.** The loop back from S7 is: the requester says the shipped change did not do what it was for, and the human spec gains a version. Every derived criterion whose parent hash no longer matches is drifted by D39 and must be re-derived before the next seal. Version n+1 is the next commit (D20) — no new mechanism is needed to express it. The technical spec never versions alone: a technical change with no human change is a different task, not a new version of this one. |
 
 ### Open, and deliberately not decided yet
 
-- **Whether `metric` is a slot at all.** D40 says an outcome and a metric are
-  recorded and gate nothing. `outcome` is not in doubt — it is the reason the
-  work was asked for, and a specification without it records what was built and
-  never what it was for. `metric` is the number that would settle whether the
-  outcome happened ("hand-mapping tickets per week under 5", against an outcome
-  of "support stops hand-mapping CSVs"). It is what makes S7's "green but wrong"
-  verdict a fact rather than a feeling, and what D41's version bump points at.
-  It is also the slot most likely to be filled with a plausible number nobody
-  will ever measure, and an unmeasured metric is worse than an absent one: it
-  makes the loop look closed. Decide before S20 adds the slot.
-- **Whether a metric can ever gate anything**, if it survives the above. D40
-  says no: D19 refuses a criterion whose evidence cannot be produced inside the
-  execution layer's boundary, and no branch can show churn moved. The pressure
-  to relax that will arrive the first time a change is green and wrong; the
-  honest answer is probably that it gates a *later* verdict in L2, never this
-  one.
+- **Whether achieving a metric ever gates anything.** D40 says no here: D19
+  refuses a criterion whose evidence cannot be produced inside the execution
+  layer's boundary, and no branch can show churn moved. The pressure to relax
+  that arrives the first time a change is green and wrong. The honest answer is
+  probably that achievement gates a *later* verdict in L2 or L3, never this one
+  — but that verdict does not exist yet, so the metric currently has a reader
+  only in S7.
+- **What a metric may be made of.** A number and a window ("under 5 per week")
+  is checkable for presence and shape. Prose ("clearly faster") is not, and
+  admitting it makes the slot filled without making it predefined in any useful
+  sense. Decide the shape in S20, when the slot is written.
 
 ## Known gaps, and what happens to each
 
@@ -698,10 +693,11 @@ anyone can hold, sign, or hand over.
 - Split `kernel/specification.ts` along the entitlement line that already
   exists: requester-owned slots become the human spec, `technical_author`-owned
   slots become the technical spec.
-- Add `outcome` as a human-spec slot, and `metric` **only if § Open resolves in
-  its favour first**. They carry no verification mechanism and no rule demands
-  evidence for them (D40) — `evidence-producible` must not see them at all,
-  rather than seeing them and being taught an exception.
+- Add `outcome` and `metric` as human-spec slots (D40). Neither carries a
+  verification mechanism and no rule demands evidence for either —
+  `evidence-producible` must not see them at all, rather than seeing them and
+  being taught an exception. A rule refuses a seal when `metric` is absent; no
+  rule ever asks whether it was met. Settle the metric's shape here, per § Open.
 - `risk`, `irreversibility`, and `authority` land on the human side (D37). This
   is the constraint the split exists to hold; put them anywhere else and D27
   stops meaning anything.
