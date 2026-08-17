@@ -10,8 +10,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run test",
-    "ui": "node bin/ui.ts"
+    "check": "npm run typecheck && npm run test"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
