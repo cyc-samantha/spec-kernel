@@ -16,15 +16,18 @@ claim comes out. **A library and a CLI** — it executes nothing, holds no
 credentials, calls no service, and reaches no model runtime from anywhere in the
 tree, not only from `kernel/`.
 
-The interview it defines is conducted by an agent reading a `SKILL.md` in
-`skills/` and calling `bin/`. That agent is the model; this repository is what it
-consults (`docs/BUILD-PLAN.md` § D36).
+**This is layer 1b. Layer 1a is an agent in a session.** 1a runs the interview
+and writes both documents; 1b defines what may be asked, what shape each document
+takes, who may fill which slot, and every verdict. **1a authors, 1b adjudicates —
+nothing here writes a specification** (`docs/BUILD-PLAN.md` § D36).
 
-What it produces is **two documents** (§ D37): a *human spec* — intent, outcome,
-metric, and acceptance claims a person can read — and a *technical spec* — target,
-scope, context, and the executable criteria that prove them. The human spec is
-verified by sign-off, the technical spec by not having drifted from what was
-signed. Both, or neither (§ D38).
+What it adjudicates is **two documents** (§ D37): a *human spec* — intent,
+outcome, and acceptance claims a person can read — and a *technical spec* —
+target, scope, context, and the executable criteria that prove them. The human
+spec is verified by sign-off, the technical spec by not having drifted from what
+was signed. Both, or neither (§ D38). `risk`, `irreversibility`, and `authority`
+are human-spec slots without exception: 1a writes the technical half, so putting
+them there would let it grant itself its own blast radius (§ D27).
 
 **It is a kernel.** It contains the universal minimum and nothing else. A
 domain's vocabulary belongs in a profile, a task type's falsifiability
