@@ -12,9 +12,19 @@ disagree, this file wins.
 ## What this is
 
 The specification layer. A human intent goes in; a contract an agent team can
-claim comes out. The kernel executes nothing, holds no credentials, and calls no
-service. The optional application shell may call a configured model runtime
-through `ports/model.ts`; no model provider or transport belongs in `kernel/`.
+claim comes out. **A library and a CLI** — it executes nothing, holds no
+credentials, calls no service, and reaches no model runtime from anywhere in the
+tree, not only from `kernel/`.
+
+The interview it defines is conducted by an agent reading a `SKILL.md` in
+`skills/` and calling `bin/`. That agent is the model; this repository is what it
+consults (`docs/BUILD-PLAN.md` § D36).
+
+What it produces is **two documents** (§ D37): a *human spec* — intent, outcome,
+metric, and acceptance claims a person can read — and a *technical spec* — target,
+scope, context, and the executable criteria that prove them. The human spec is
+verified by sign-off, the technical spec by not having drifted from what was
+signed. Both, or neither (§ D38).
 
 **It is a kernel.** It contains the universal minimum and nothing else. A
 domain's vocabulary belongs in a profile, a task type's falsifiability
@@ -31,7 +41,8 @@ or explicitly deferred, and no `proposed` provenance left in it. See
 
 | File | For |
 |---|---|
-| `docs/BUILD-PLAN.md` | the decision ledger and completed slice history — read this before changing anything |
+| `docs/BUILD-PLAN.md` | the decision ledger, the slice history, and the planned slices — read this before changing anything |
+| `docs/L1-REARCHITECTURE-TRIAGE.md` | why the layer was retargeted; superseded in part by § D36, kept for the reasoning |
 | `README.md` | someone adopting the kernel |
 | `CLAUDE.md` | an agent working on **this** repo |
 
@@ -77,3 +88,9 @@ refactor: <what came out>
 ```
 
 Every commit is green.
+
+**Suspended for S19–S22, from 2026-08-17.** The layer is being retargeted and the
+shape of the two documents is being found by building them, so green-per-commit
+and per-slice branches are relaxed until S22 lands. Two things do not relax: a
+gate still ships its two tests, and an anti-entropy failure is still fixed in the
+code, never in the threshold. See `docs/BUILD-PLAN.md` § Part 2.

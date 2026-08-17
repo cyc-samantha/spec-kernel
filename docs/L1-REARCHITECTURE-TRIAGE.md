@@ -1,5 +1,28 @@
 # L1 re-architecture — decision triage & resolution (D6–D35)
 
+> **Superseded in part, same day.** `docs/BUILD-PLAN.md` § D36 retires the
+> central resolution below: there is no `spec-intake` repository. The
+> elicitation agent is the model in the session, so the question set, the
+> entitlement table, and every verdict stay here and the "exactly one document
+> crosses the boundary" seam has no boundary to cross. What that removes:
+>
+> | Resolved below | Now |
+> |---|---|
+> | Two repositories, joined by the Standard Spec | One repository plus an agent reading `skills/*/SKILL.md` |
+> | Pre-flight oracle as a versioned cross-repo dependency | An ordinary in-process call; versioning is instead the D41 loop back from a wrong outcome |
+> | Import-time entitlement re-verification | Dropped — nothing is imported, and the idea is not built out enough to design against |
+> | D23's spec-kernel twin ("one recognized source") | Dropped with the boundary. Undesigned, not merely unbuilt — D20 forbids a signature service |
+> | D8, D9, D10, D12, D25–D30, D32, D34, D35 "migrate to `spec-intake`" | They bind whatever conducts the interview. That is now an agent, not code in this tree — so they are constraints on `skills/`, which nothing tests |
+>
+> What survives unchanged: this repository sheds its model runtime, and the
+> structural decisions (D7, D14, D16, D18–D21, D31) still bind. The per-decision
+> triage below is kept because every entry was written against a real incident,
+> and the incidents stay true whichever document currently governs the repo.
+>
+> The document is retained for that reasoning trail. It is no longer a statement
+> of the architecture; `docs/BUILD-PLAN.md` § "Two documents, one specification"
+> is.
+
 **Status: resolved 2026-08-17.** Written for the conversation that decided:
 Layer 1a (Claude API, GrillMe-style elicitation → Standard Spec) becomes its
 **own repository, `spec-intake`**, upstream of this one. Layer 1b

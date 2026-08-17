@@ -5,7 +5,11 @@ pick this up and continue. Read it before changing anything.
 
 Part 1 is the decision ledger. It is the acceptance criteria for every slice; when
 a question comes up mid-build, look it up here rather than re-deciding it. Part 2
-is the engineering contract. Part 3 is the completed slice history.
+is the engineering contract. Part 3 is the completed slice history. Part 4 is what
+is planned and not yet built.
+
+**Read § "Two documents, one specification" (D36–D41) first.** It was written
+after S18 and it retargets the layer: where it disagrees with D1–D35, it wins.
 
 ---
 
@@ -15,6 +19,8 @@ Three layers, three repositories, already partly built.
 
 ```
 L1  spec-kernel          human intent  ->  sealed specification        <- this repo
+        │                  ├─ human spec      what is wanted, and how we will know   (D37)
+        │                  └─ technical spec  how it is built, and how a machine proves it
         │
 L2  agent-ticket-system  sealed spec   ->  contract, queue, ledger
         │
@@ -27,6 +33,19 @@ example and a purity pressure test. It is never a source of content for the
 kernel.
 
 L2 and L3 exist and work. This repository is the missing front half.
+
+**This repository is a library and a CLI.** It holds the question set, the two
+document shapes, the entitlement table, and the verdicts. It runs no
+conversation and configures no model runtime. The conversation that fills a
+specification is conducted by an agent reading a `SKILL.md` in `skills/` and
+calling `bin/`. See D36.
+
+> **Open — layer naming.** An earlier session split L1 into `1a` (elicitation)
+> and `1b` (compile and seal), on the assumption they would be separate
+> repositories. D36 retires that assumption, so this document treats L1 as one
+> layer and L2 as what receives a sealed contract. If `1b` is still meant to
+> name something downstream of the technical spec, it needs a definition here
+> before any slice depends on it.
 
 ---
 
@@ -91,6 +110,35 @@ L2 and L3 exist and work. This repository is the missing front half.
 | **D33** | **A specification has one entrance: what a person says in the interview.** Accepting a draft is read out of the message, deterministically, before the model is consulted — a translator that could recognise its own approval would be approving its own work (D8), so agreement never reaches it. Recognition stays narrow: a message carrying content falls through to an ordinary turn, where a value the human stated outranks any draft standing in that slot, because discarding it leaves the machine's guess in its place. A draft whose consequence is `authority` is unreachable by a general agreement and must be named (D14). No second route writes to the document — a tick box beside a conversation that keeps asking the same question teaches a requester that answering does nothing. |
 | **D34** | **The translator is told which slots hold a draft, never what the draft says.** Measured on `qwen3.5:2b`: the turn enumerating four column mappings returned one — the mapping the standing draft held — and returned all four with that draft withheld. A drafted value in view is something to copy, and copying is cheaper than reading, so carrying it forward buys nothing and costs the message. The slot name is the whole requirement: enough not to spend a bounded budget redrafting, with nothing to reproduce in place of what the requester said. |
 | **D35** | **A value's shape is enforced where it is generated, not refused after it arrives.** The translator was handed a description of the shape and an unconstrained slot to put it in; both local models filled the slot with a self-describing envelope built out of the description. A gap already carries its schema, so the provider format names one variant per offered gap with that schema in place. What a gap does *not* hand the translator matters as much: entitlement, authorship, and the human-facing refusal message were adjacent fields to copy into the value, and both models copied them. |
+
+## Two documents, one specification
+
+Written 2026-08-17. D36–D41 retarget the layer. Where they disagree with D1–D35,
+they win; where they are silent, D1–D35 still hold. `docs/L1-REARCHITECTURE-TRIAGE.md`
+carries the reasoning that led here and the two-repository resolution D36 retires.
+
+| # | Decision |
+|---|---|
+| **D36** | **There is no second repository. The elicitation agent is the model in the session.** The question set, the entitlement table, and every verdict live here as a library and a CLI; the conversation that fills them is conducted by an agent reading `skills/*/SKILL.md` and calling `bin/`. Nothing here configures, names, or reaches a model runtime — not because the model lives elsewhere, but because the model is the caller. `ports/model.ts` and an adapter under `adapters/` are therefore not a neutral boundary this repository needs; they are a second, weaker interviewer competing with the one that already has the context. Retires the two-repository resolution in `docs/L1-REARCHITECTURE-TRIAGE.md`, and with it D24, D25, D30, D34, and D35 — those bind whatever conducts the interview, which is no longer code in this tree. |
+| **D37** | **A specification is two documents, not one.** The **human spec** is what the requester wants, why, and how they will know it worked: intent, outcome, metric, and acceptance claims a person can read. The **technical spec** is how it gets built and how a machine proves it: target, scope, context, constraints, and executable criteria. A requester is never asked to author the second; the second may never contradict the first. `awaiting_technical_completion` (D16) stops being an interview state and becomes the boundary between them — the point at which the human half is finished and the technical half has not started. |
+| **D38** | **Each half is verified by a different question, and both are required.** The human spec is verified by **sign-off**: a named, entitled human says this is what they want. The technical spec is verified by **no drift**: every human claim still has technical criteria tracing to the exact text that was signed. A signed human spec beside a drifted technical spec is not partially ready — it is refused. Two verdicts, one gate. |
+| **D39** | **`derivedFrom` carries the parent's content hash, not only its id.** An id survives an edit to the thing it names, so revising a human criterion leaves its derived tests pointing at it and silently stale: all green, proving something nobody is asking for any more. The hash turns drift into a fact a program checks instead of a thing a reviewer must notice. This is `context[].contentSha` — already in the schema — applied to the one link that carries authorship. Extends D18; it is the mechanism D38's second verdict runs on. |
+| **D40** | **An outcome or a metric is not an acceptance criterion.** "Churn drops five percent" cannot produce evidence inside a branch, so D19 refuses it and `evidence-producible` is right to. But it is the reason the work was asked for, and a specification that drops it records what was built and never what it was for. Outcome and metric are their own slots: no verification mechanism, gating nothing, refusing nothing. They exist to be the ruler the outcome record (S7) is read against — which is what turns "all criteria green, still wrong" from an anecdote into an answerable question. |
+| **D41** | **A wrong outcome versions the human spec, not the technical one.** The loop back from S7 is: the requester says the shipped change did not do what it was for, and the human spec gains a version. Every derived criterion whose parent hash no longer matches is drifted by D39 and must be re-derived before the next seal. Version n+1 is the next commit (D20) — no new mechanism is needed to express it. The technical spec never versions alone: a technical change with no human change is a different task, not a new version of this one. |
+
+### Open, and deliberately not decided yet
+
+- **Who authors the technical spec.** If an agent drafts it, D8 (may not answer
+  its own question) and D27 (`risk`, `irreversibility`, and `authority` can
+  never be `machine_derives`) both bite: a machine that fills the technical half
+  unattended has chosen its own blast radius. `technical_author` already exists
+  as an entitlement, so the machinery is there and the policy is not. Decide
+  before S21 writes a rule that assumes an answer.
+- **Whether a metric can ever gate anything.** D40 says no today. The pressure
+  to make it gate will arrive the first time a shipped change is green and
+  wrong; the honest answer may be that it gates a *later* verdict in L2, not
+  this one.
+
 ## Known gaps, and what happens to each
 
 | Gap | Decision |
@@ -130,6 +178,15 @@ refactor: <what came out>
 ```
 
 Every commit is green.
+
+> **Suspended for S19–S22, from 2026-08-17.** The layer is being retargeted
+> (D36–D41) and the shape of the two documents is still being found by building
+> them, so "every commit is green" and per-slice branch discipline are relaxed
+> while that is true. This is a dated exception with a named end: it lifts when
+> S22 lands. Two things do **not** relax — a gate still ships its two tests, and
+> an anti-entropy test failure is still fixed in the code and never in the
+> threshold. Those exist to resist pressure that is invisible in the moment,
+> which is exactly the condition a prototype is in.
 
 ---
 
@@ -589,6 +646,122 @@ they answered.
 
 ---
 
+# Part 4 — Planned slices
+
+S0–S18 above are done. These four are not. They carry out D36–D41 and are
+ordered by what each one unblocks, not by size: S19 shrinks the surface the rest
+have to stay consistent with, S20 defines the document S21 checks, and S22 needs
+S21's hash to have something to invalidate.
+
+---
+
+### S19 · The repository sheds its model runtime — **PLANNED**
+
+`branch: s19-shed-the-model`
+
+Carries out D36. `kernel/` imports nothing from `ports/model.ts`, `adapters/`,
+or `ui/` — the import graph runs one way only — so this is a leaf deletion, not
+surgery on the trunk. What survives is the whole deterministic core and its four
+CLIs: `bin/seal-check.ts`, `bin/interview.ts`, `bin/split.ts`,
+`bin/record-outcome.ts`.
+
+- Delete `ui/`, `adapters/`, `ports/model.ts`, `bin/ui.ts`, the `ui` script in
+  `package.json`, and the six test files that exist only to cover them.
+- `skills/` stays and becomes the primary surface. Under D36 it is not a seed to
+  export — it is how the interview is conducted.
+- `skills/elicit-specification/SKILL.md` still instructs the agent to say *"That
+  did not answer the question I asked."* S18 removed that string from
+  `kernel/interview.ts` because the claim is false exactly when the translation
+  failed, not the requester. Untested prose drifted from the kernel inside one
+  slice; correct it here and record that `skills/` has nothing testing it.
+- `README.md` and `CLAUDE.md` drop the model-runtime, adapter, and browser
+  sections. `CLAUDE.md`'s "the optional application shell may call a configured
+  model runtime through `ports/model.ts`" is the line D36 contradicts.
+
+**Done when**: the deterministic core is intact, `examples/engineer-draft.output.json`
+still reaches sealed through `bin/seal-check.ts`, and no file outside `docs/`
+names a model provider, adapter, or runtime endpoint.
+
+---
+
+### S20 · The human half is its own document — **PLANNED**
+
+`branch: s20-human-spec`
+
+Carries out D37 and D40. Today one schema interleaves both halves, so "the
+requester has finished" is a state the interview computes rather than a document
+anyone can hold, sign, or hand over.
+
+- Split `kernel/specification.ts` along the entitlement line that already
+  exists: requester-owned slots become the human spec, `technical_author`-owned
+  slots become the technical spec.
+- Add `outcome` and `metric` as human-spec slots. They carry no verification
+  mechanism and no rule demands evidence for them (D40) — `evidence-producible`
+  must not see them at all, rather than seeing them and being taught an
+  exception.
+- `awaiting_technical_completion` becomes the boundary between the two documents
+  instead of a terminal state of one (D37).
+- Sign-off is recorded against the human spec alone, with the signer named and
+  the signed content hashed — S21 needs that hash to exist.
+
+**Done when**: a human spec whose technical slots are all empty is a complete,
+signable document rather than an incomplete one; a metric can be recorded and no
+rule asks it to name a test; and the two halves round-trip through the CLI
+separately.
+
+---
+
+### S21 · The technical half is derived and cannot drift — **PLANNED**
+
+`branch: s21-no-drift`
+
+Carries out D38 and D39, and closes a hole that is live today: `derivedFrom` is
+a bare id (`kernel/specification.ts`), so editing a human criterion's text
+leaves every derived test pointing at it, passing, and proving something nobody
+is asking for. The idiom for the fix is already in the same file —
+`context[].contentSha`.
+
+- `derivedFrom` carries the parent criterion's content hash alongside its id.
+- A new rule reports every derived criterion whose recorded parent hash does not
+  match the parent's current text, naming both sides. It is relational tier: it
+  cannot run until the structural rules admit both documents.
+- This is a gate, so it ships the two tests the contract requires: one that goes
+  red when its fail-closed line is reverted, and one that feeds it a document
+  whose parent criterion is missing entirely and asserts it refuses rather than
+  reporting no drift.
+- A seal needs both verdicts (D38). Signed-but-drifted is refused, not reported
+  as partial progress.
+
+**Done when**: changing one word of a signed human criterion refuses the seal
+and names which derived criterion drifted from which parent, and a technical
+spec that covers every signed claim with matching hashes seals.
+
+---
+
+### S22 · A wrong outcome versions the human spec — **PLANNED**
+
+`branch: s22-outcome-versions`
+
+Carries out D41, and is the first slice that makes S7 do work. The outcome
+record already stores the specification version, the requester's verdict, and
+which rule was missing; nothing reads it.
+
+- A "green but wrong" outcome opens version n+1 of the human spec. Version n+1
+  is the next commit (D20) — this slice adds the transition, not a version
+  store.
+- Every derived criterion whose parent hash no longer matches is drifted by S21
+  already. This slice adds nothing to detect it; it only makes the re-seal
+  refuse until each drifted criterion is re-derived or explicitly re-affirmed by
+  a named author.
+- The technical spec does not version on its own (D41). A technical-only change
+  is a different specification.
+
+**Done when**: recording "all criteria green and the requester says no" against
+a sealed specification produces a human spec at version n+1 that cannot re-seal
+while any criterion derived from the old text is still standing.
+
+---
+
 ## Deliberately not built
 
 Written down so nobody rediscovers them mid-build.
@@ -600,7 +773,15 @@ Written down so nobody rediscovers them mid-build.
 - **In-flight overlap detection.** Wait for ten contracts a day.
 - **Pricing vagueness back to the requester.** Wait for abuse data.
 - **Any change to L2.** Output feeds the existing adapter.
-- **Enterprise model adapters.** `ModelPort` is stable; add the adapter when a
-  deployment names its approved runtime rather than guessing one in the kernel.
+- **A model port, an adapter, or any browser surface.** Retired by D36, not
+  deferred by it. The interview is conducted by the agent that already has the
+  context; a `ModelPort` in this tree is a second, weaker interviewer competing
+  with it. If a deployment ever needs to run the interview without an agent, that
+  is a new decision, not this one resumed.
+- **A source-recognition mechanism for imported specifications.** D23's
+  spec-kernel-side twin existed only because a second repository was going to
+  hand documents across a boundary. D36 removes the boundary. If one returns,
+  note that D20 forbids a signature service, so the mechanism is undesigned —
+  not merely unbuilt.
 - **Execution basis / envelope.** Already done in `lite-harness/engine/envelope.ts`
   — this is not a gap.
