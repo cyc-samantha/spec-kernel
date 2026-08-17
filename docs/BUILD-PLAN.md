@@ -652,7 +652,7 @@ S21's hash to have something to invalidate.
 
 ---
 
-### S19 · The repository sheds its model runtime — **PLANNED**
+### S19 · The repository sheds its model runtime — **DONE**
 
 `branch: s19-shed-the-model`
 
@@ -679,6 +679,30 @@ CLIs: `bin/seal-check.ts`, `bin/interview.ts`, `bin/split.ts`,
 **Done when**: the deterministic core is intact, `examples/engineer-draft.output.json`
 still reaches sealed through `bin/seal-check.ts`, and no file outside `docs/`
 names a model provider, adapter, or runtime endpoint.
+
+**What landed.** 1893 lines of test and 2024 of source removed; 102 of the 196
+tests survived, and they are the whole deterministic core. The import graph had
+always run one way, so nothing needed rewriting to make the deletion safe.
+
+`tests/anti-entropy/no-model-runtime.test.ts` was not in the plan and is the part
+worth keeping. D36 was a statement in a document, and the pressure it resists —
+"just a fallback for when something is missing" — arrives precisely when nobody
+is reading the document. The test scans every tracked file rather than only
+`kernel/`, because the shell that used to be allowed to hold a port no longer
+exists. `docs/` and `tests/anti-entropy/` are exempt for one reason: a rule has
+to be able to say what it forbids.
+
+Two false positives were fixed in the test rather than in its lists. `CLAUDE.md`
+is a reserved filename, not a provider, so the literal filename is stripped
+before scanning and "call the Claude API" still fails. Dropping the vendor from
+the list to make the filename pass would have been fixing the threshold.
+
+The skill drift was real and is the open flank D36 leaves. `skills/elicit-specification/SKILL.md`
+still told the agent to say *"That did not answer the question I asked"* one
+slice after S18 removed it from the kernel for being false in exactly the case
+it fires. Nothing tests `skills/`, and D36 moves a dozen hard-won decisions
+(D8, D10, D12, D26–D29, D32) out of typed, tested code and into that untested
+prose. Naming the cost here so the next slice can decide whether to pay it.
 
 ---
 
