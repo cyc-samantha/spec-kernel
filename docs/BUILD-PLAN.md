@@ -834,7 +834,7 @@ the old text was a claim the derived test already covered.
 
 ---
 
-### S19c · The output is admitted by the layer that consumes it — **PLANNED**
+### S19c · The output is admitted by the layer that consumes it — **DONE**
 
 `branch: s19c-contract-projection`
 
@@ -852,6 +852,41 @@ does not exist here.
 
 **Done when**: the golden example projects to a contract L2's `workContractSchema`
 accepts, and reverting any one projection line goes red.
+
+**What landed.** It does: the projected golden example was parsed by
+`agent-ticket-system`'s own schema and accepted. Four things came out of building
+it that were not visible from reading.
+
+**D3's claim was true by accident.** L3 does not consume this repository. It
+consumes `WorkContract` through `ports/work-source.ts`, and a source adapter maps
+whatever the source holds into it. The sealed document passed L3's shape check
+because both happened to be camelCase and L3's schema is `.passthrough()` — not
+because anything was built to hand it over. The next hop was always L2.
+
+**A pinned pointer needed a time.** L2 requires `retrieved_at` on every context
+reference and this layer had nowhere to put one, so `context[]` gained
+`retrievedAt`. That is not a downstream detail leaking upward: a hash with no
+time it was taken cannot be aged, and "this is what the file said" and "this is
+what the file said in March" are different claims. Only the second can be
+doubted.
+
+**A decision the document answers is not blocking.** `blocking_decisions` carries
+only the deferred ones. The kernel's schema already makes `deferred: false` imply
+an answer, and handing a settled question downstream stalls the work on it —
+L2 learns answers out of band, from its environment, so a resolved decision in the
+contract is unanswerable from the contract.
+
+**The refusals are the design.** The projection will not rename a criterion to fit
+`AC-\d{2,}`, will not invent a git object name, and will not project a document
+`sealCheck` has not admitted. Renaming would satisfy the schema and break the
+reference the trace is for; the other two are the fail-open this boundary exists
+to prevent.
+
+The one cost taken knowingly: `tests/fixtures/consuming-contract-shape.ts` is a
+hand-copied mirror of L2's schema, which is the second list D6 warns about.
+Re-verify against the real one by parsing a projected contract with
+`agent-ticket-system`'s `workContractSchema` — deliberately not automated, since
+automating it is the coupling D45 refuses.
 
 ---
 

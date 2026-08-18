@@ -99,6 +99,7 @@ agent may do unsupervised must be accepted one at a time.
 | `kernel/split.ts` | split proposal validation by dependence and repository boundary |
 | `kernel/published-schema.ts` | the document shape and its questions, derived from the rules so it cannot drift from them |
 | `ports/project.ts` | repository boundary, entitlement identities, and signer |
+| `ports/contract.ts` | the projection from a sealed document to the contract the ticket layer queues |
 | `skills/draft-specification/` | what 1a reads for assert-first intake |
 | `skills/elicit-specification/` | what 1a reads for elicit-first intake, driven only by missing items |
 
