@@ -77,6 +77,13 @@ const fixtures: readonly QuestionFixture[] = [
     },
   },
   {
+    ruleId: 'rubric-argued',
+    removeAnswer(specification) {
+      delete specification.acceptance[0]!.rubricRationale;
+      return specification;
+    },
+  },
+  {
     ruleId: 'spike-knowledge-output',
     removeAnswer(specification) {
       specification.intent.kind = 'spike';

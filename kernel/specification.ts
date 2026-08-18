@@ -2,10 +2,16 @@ import { z } from 'zod';
 
 const nonBlank = z.string().trim().min(1);
 
+/*
+ * `human_review` is absent deliberately (D43). "Somebody looks at it" names no
+ * standard and assigns no one, so it passes every gate by having a value and
+ * stalls at the boundary where the looking was supposed to happen. A rubric is
+ * the honest version: a written standard a person applies and a requester can
+ * disagree with.
+ */
 export const verificationMechanisms = [
   'executable_test',
   'deterministic_assertion',
-  'human_review',
   'rubric',
 ] as const;
 
@@ -21,6 +27,7 @@ const criterionBase = {
   text: nonBlank,
   verification: z.enum(verificationMechanisms),
   targetTest: targetTestSchema.optional(),
+  rubricRationale: nonBlank.optional(),
 };
 
 export const acceptanceCriterionSchema = z.discriminatedUnion('provenance', [
