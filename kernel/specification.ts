@@ -75,6 +75,12 @@ export const specificationSchema = z.object({
     z.object({
       uri: nonBlank,
       contentSha: nonBlank,
+      /*
+       * A hash without a time it was taken cannot be aged. "This is what the
+       * file said" and "this is what the file said in March" are different
+       * claims, and only the second one can be doubted.
+       */
+      retrievedAt: z.iso.datetime(),
       why: nonBlank,
     }),
   ),

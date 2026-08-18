@@ -208,7 +208,7 @@ const structuralRules: readonly Rule[] = [
     question: 'Which existing files must the implementer read first? An empty list is an answer.',
     entitlement: 'technical_author',
     authorship: 'human_confirms',
-    schema: z.array(z.object({ uri: nonBlank, contentSha: nonBlank, why: nonBlank })),
+    schema: z.array(z.object({ uri: nonBlank, contentSha: nonBlank, retrievedAt: z.iso.datetime(), why: nonBlank })),
   }),
   slotRule({
     id: 'authority-granted',
