@@ -4,7 +4,12 @@ import { publishedSchema } from '../kernel/published-schema.ts';
 import { rules } from '../kernel/rules.ts';
 import { SPEC_SCHEMA_VERSION } from '../kernel/version.ts';
 
-const structuralSlots = rules.filter((rule) => rule.tier === 'structural').map((rule) => rule.slot);
+const isRootSlot = (slot: string): boolean => !slot.includes('.') && !slot.includes('*');
+const rootSlots = rules.map((rule) => rule.slot).filter(isRootSlot);
+const structuralSlots = rules
+  .filter((rule) => rule.tier === 'structural')
+  .map((rule) => rule.slot)
+  .filter(isRootSlot);
 
 describe('published schema', () => {
   it('states the version a consumer pins, not a snapshot of today', () => {
@@ -13,8 +18,20 @@ describe('published schema', () => {
 
   it('publishes every structural slot as a required property', () => {
     const { document } = publishedSchema();
-    expect(Object.keys(document['properties'] as Record<string, unknown>).sort()).toEqual([...structuralSlots].sort());
+    expect(Object.keys(document['properties'] as Record<string, unknown>).sort()).toEqual([...rootSlots].sort());
     expect(document['required']).toEqual(structuralSlots);
+  });
+
+  /*
+   * `signature` is needed only when the blast radius demands it, so it is a
+   * property and not a requirement. Publishing it as required would make every
+   * low-risk document look unfinished; leaving it out entirely would hide a slot
+   * a rule reads, which is worse — 1a would learn about it from a refusal.
+   */
+  it('publishes an optional slot as a property without requiring it', () => {
+    const { document } = publishedSchema();
+    expect(Object.keys(document['properties'] as Record<string, unknown>)).toContain('signature');
+    expect(document['required']).not.toContain('signature');
   });
 
   /*

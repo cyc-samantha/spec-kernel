@@ -75,16 +75,23 @@ function publishRule(rule: Rule): PublishedRule {
 }
 
 /*
- * A relational rule reads across slots it does not own — `acceptance.*.verification`
- * is not a property of the document. Publishing it as one would tell 1a to write a
- * key no rule reads.
+ * `acceptance.*.verification` is a path across criteria, not a key of the
+ * document; publishing it as a property would tell 1a to write a slot no rule
+ * reads. A root-level slot is a property whichever tier owns it — `signature` is
+ * relational, because whether it is needed depends on `risk` and
+ * `irreversibility`, and it is still a key someone has to write.
  */
+function isRootSlot(rule: Rule): boolean {
+  return !rule.slot.includes('.') && !rule.slot.includes('*');
+}
+
 function documentOf(structural: readonly Rule[]): JsonSchema {
+  const properties = rules.filter(isRootSlot);
   return {
     ...dialectOf(structural),
     type: 'object',
-    properties: Object.fromEntries(structural.map((rule) => [rule.slot, withoutDialect(rule.valueSchema)])),
-    required: structural.map((rule) => rule.slot),
+    properties: Object.fromEntries(properties.map((rule) => [rule.slot, withoutDialect(rule.valueSchema)])),
+    required: structural.filter(isRootSlot).map((rule) => rule.slot),
   };
 }
 

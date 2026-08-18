@@ -90,6 +90,24 @@ const fixtures: readonly QuestionFixture[] = [
       return specification;
     },
   },
+  {
+    ruleId: 'signature-required',
+    removeAnswer(specification) {
+      specification.risk = 'critical';
+      return specification;
+    },
+  },
+  {
+    ruleId: 'signature-binds-content',
+    removeAnswer(specification) {
+      specification.signature = {
+        by: 'someone entitled',
+        at: '2026-08-18T09:00:00Z',
+        contentSha: '0'.repeat(64),
+      };
+      return specification;
+    },
+  },
 ];
 
 describe('question derivation', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { signableContentSha } from '../kernel/canonical.ts';
 import { rules } from '../kernel/rules.ts';
 import { sealCheck } from '../kernel/seal-check.ts';
 import { specificationSchema, type Specification } from '../kernel/specification.ts';
@@ -82,7 +83,7 @@ describe('the v1 rules', () => {
   });
 
   it('keeps each check, question, entitlement, and authorship in one rule object', () => {
-    expect(rules).toHaveLength(20);
+    expect(rules).toHaveLength(22);
     for (const rule of rules) {
       expect(rule.question.trim()).not.toBe('');
       expect(rule.entitlement).toMatch(/^(requester|technical_author)$/);
@@ -95,14 +96,14 @@ describe('the v1 rules', () => {
   });
 
   /*
-   * These three slots decide how much damage an agent may do unsupervised.
-   * A machine may draft them; only a named person may turn a draft into the
-   * grant itself (D14, D22).
+   * These slots decide how much damage an agent may do unsupervised, and who
+   * said it could. A machine may draft them; only a named person may turn a
+   * draft into the grant itself (D14, D22).
    */
   it('never lets a machine originate an authority grant', () => {
     const consequential = rules.filter((rule) => rule.consequence === 'authority');
     expect(consequential.map((rule) => rule.slot).sort())
-      .toEqual(['authority', 'irreversibility', 'risk']);
+      .toEqual(['authority', 'irreversibility', 'risk', 'signature', 'signature.contentSha']);
     for (const rule of consequential) {
       expect(rule.authorship).toBe('human_confirms');
     }
@@ -164,6 +165,97 @@ describe('spike specifications', () => {
     const specification = validSpecification();
     specification.intent.kind = 'spike';
     expect(ruleIdsFor(specification)).toEqual(['spike-knowledge-output']);
+  });
+});
+
+/*
+ * D46. Until now `sealed` meant "every rule passed", and the two documents most
+ * worth stopping — a rewrite, and a critical risk — were exactly the ones this
+ * layer sealed and left the execution layer to refuse afterwards, by which time
+ * a team has already built against the shape.
+ */
+describe('the seal', () => {
+  function signedCopy(specification: Specification): Specification {
+    return {
+      ...specification,
+      signature: {
+        by: 'a named approver',
+        at: '2026-08-18T09:00:00Z',
+        contentSha: signableContentSha(specification),
+      },
+    };
+  }
+
+  function ruleNamed(id: string) {
+    const rule = rules.find((candidate) => candidate.id === id);
+    if (!rule) throw new Error(`no rule named ${id}`);
+    return rule;
+  }
+
+  it('does not ask a low-risk document for a signature', () => {
+    expect(sealCheck(validSpecification())).toEqual([]);
+  });
+
+  it.each(['rewrite', 'critical'])('refuses to seal an unsigned %s', (blastRadius) => {
+    const specification = validSpecification();
+    if (blastRadius === 'rewrite') specification.irreversibility = 'rewrite';
+    else specification.risk = 'critical';
+    expect(ruleIdsFor(specification)).toEqual(['signature-required']);
+  });
+
+  it('seals the same document once it is signed', () => {
+    const specification = validSpecification();
+    specification.risk = 'critical';
+    expect(sealCheck(signedCopy(specification))).toEqual([]);
+  });
+
+  /*
+   * The signature is not part of what it signs, so countersigning is not an
+   * edit. If it were, the second signer would invalidate the first and no
+   * document could ever carry two.
+   */
+  it('does not treat signing as a change to the thing signed', () => {
+    const specification = validSpecification();
+    expect(signableContentSha(signedCopy(specification))).toBe(signableContentSha(specification));
+  });
+
+  it('refuses a document edited after it was signed, and names both hashes', () => {
+    const signed = signedCopy(validSpecification());
+    signed.scope.include.push('src/export/legacy/**');
+    const problems = sealCheck(signed);
+    expect(problems.map((problem) => problem.ruleId)).toEqual(['signature-binds-content']);
+    expect(problems[0]?.message).toContain('no longer matches');
+  });
+
+  /*
+   * The fail-closed halves. Both rules read across slots, so `sealCheck` never
+   * hands them a non-document — which is precisely why the branch has to be
+   * tested directly. A gate that has never been asked an unanswerable question
+   * has not been shown to refuse one.
+   */
+  it.each(['signature-required', 'signature-binds-content'])('%s refuses what it cannot read', (id) => {
+    for (const unevaluable of [undefined, null, 'a specification', 42]) {
+      expect(ruleNamed(id).check(unevaluable)).toHaveLength(1);
+    }
+  });
+
+  it('reports a signature it cannot parse as a missing one, not a satisfied slot', () => {
+    const specification = validSpecification() as Record<string, unknown>;
+    specification['risk'] = 'critical';
+    specification['signature'] = { by: 'a named approver', at: 'yesterday' };
+    expect(ruleIdsFor(specification)).toEqual(['signature-required']);
+  });
+
+  /*
+   * The drift rule skips a signature it cannot parse, so that one bad value
+   * produces one question rather than two. That is only safe while the rule
+   * above refuses a malformed signature nobody asked for — this asserts the
+   * pairing, which is the seam a later change would open without noticing.
+   */
+  it('refuses a malformed signature even on a document that needed none', () => {
+    const specification = validSpecification() as Record<string, unknown>;
+    specification['signature'] = { by: 'a named approver', at: 'yesterday' };
+    expect(ruleIdsFor(specification)).toEqual(['signature-required']);
   });
 });
 

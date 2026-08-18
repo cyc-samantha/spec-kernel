@@ -59,6 +59,21 @@ export const blockingDecisionSchema = z.discriminatedUnion('deferred', [
   z.object({ ...blockingDecisionBase, deferred: z.literal(false), answer: nonBlank }),
 ]);
 
+/**
+ * A named person, a time, and the text they were looking at.
+ *
+ * `contentSha` is strict where `context[].contentSha` is not, and the difference
+ * is not an oversight: a context hash is somebody else's hash of somebody else's
+ * file, while this one is computed here, by `signableContentSha`, over this
+ * document. A layer may be lenient about what it is handed and must not be
+ * lenient about what it produces.
+ */
+export const signatureSchema = z.object({
+  by: nonBlank,
+  at: z.iso.datetime(),
+  contentSha: z.string().regex(/^[0-9a-f]{64}$/, 'expected a lowercase hex sha256'),
+});
+
 /** The document handed to the execution boundary once every rule admits it. */
 export const specificationSchema = z.object({
   intent: z.object({ kind: z.enum(['change', 'spike']) }),
@@ -99,12 +114,7 @@ export const specificationSchema = z.object({
   risk: z.enum(['low', 'medium', 'high', 'critical']),
   dependsOn: z.array(nonBlank),
   blockingDecisions: z.array(blockingDecisionSchema),
-  signature: z
-    .object({
-      by: nonBlank,
-      at: nonBlank,
-    })
-    .optional(),
+  signature: signatureSchema.optional(),
 });
 
 export type AcceptanceCriterion = z.infer<typeof acceptanceCriterionSchema>;

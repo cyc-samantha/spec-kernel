@@ -890,7 +890,7 @@ automating it is the coupling D45 refuses.
 
 ---
 
-### S19d · The seal is a fact, not a verdict — **PLANNED**
+### S19d · The seal is a fact, not a verdict — **DONE**
 
 `branch: s19d-the-seal`
 
@@ -906,6 +906,42 @@ Carries out D46 and D20's unbuilt half.
 
 **Done when**: a `risk: critical` document cannot reach `sealed` unsigned, and
 editing one byte after signing invalidates the signature.
+
+**What landed.** Two rules, not one, and the reason is the interesting part. A
+missing signature and a stale one need different answers — *get it signed* versus
+*it changed, sign again* — so they are different questions and therefore
+different rules (D6). `signature-required` owns the whole slot including a
+malformed value; `signature-binds-content` runs only on a signature it can parse.
+Without that split one unreadable value produced two questions, which is the
+failure `structuralCriterionSchema` was already written to avoid.
+
+The pairing is a seam, so it has its own test: a malformed signature on a
+low-risk document — one that needed no signature at all — is still refused. Drop
+that and the drift rule's skip becomes a fail-open, silently.
+
+`signableContentSha` hashes the document with the signature removed. A signature
+cannot cover its own bytes, and the useful consequence is that signing is not an
+edit: two people can sign the same text and neither invalidates the other. That
+is asserted, because it is the kind of property that is true by accident until
+somebody refactors.
+
+`signature.contentSha` is strict lowercase sha256 where `context[].contentSha` is
+not, and the asymmetry is deliberate: a context hash is somebody else's hash of
+somebody else's file, and this one is produced here. A layer may be lenient about
+what it is handed and must not be lenient about what it emits.
+
+Two things this slice did **not** close. `ports/project.ts` still declares
+`signing_identity` and no rule reads it — checking the signer against the
+declaration needs the project declaration inside `sealCheck`, which today takes
+only a document. And the contract carries no signature at all: the layer below
+learns which contracts are signed from its own environment, not from the
+contract, so a sign-off recorded here still has no channel into it. Both are real
+and neither is a one-line fix; they belong to whoever takes the seal further.
+
+The published shape moved with it. `signature` is a root-level slot owned by a
+relational rule, so `documentOf` now publishes a property for every root slot and
+requires only the structural ones. Publishing only structural slots would have
+hidden a slot a rule reads, and 1a would have discovered it from a refusal.
 
 ---
 

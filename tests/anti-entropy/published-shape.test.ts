@@ -32,12 +32,13 @@ describe('published shape', () => {
   });
 
   /*
-   * An optional slot is one the type tolerates and no rule reads — `signature`
-   * today. It is deliberately unpublished: telling 1a to write a field nothing
-   * adjudicates is how a value comes to look authoritative without being checked.
+   * A published slot no rule reads is worse than an absent one: it tells 1a to
+   * write a field nothing adjudicates, which is how a value comes to look
+   * authoritative without being checked. Ownership is what publishes a slot —
+   * not the document type, and not either tier in particular.
    */
   it('publishes no slot that no rule owns', () => {
-    const owned = new Set(rules.filter((rule) => rule.tier === 'structural').map((rule) => rule.slot));
+    const owned = new Set(rules.map((rule) => rule.slot));
     const published = Object.keys(publishedSchema().document['properties'] as Record<string, unknown>);
     expect(published.filter((slot) => !owned.has(slot))).toEqual([]);
   });
