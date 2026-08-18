@@ -19,6 +19,7 @@ export const ruleIds = [
   'proposals-resolved',
   'human-criteria-covered',
   'evidence-producible',
+  'rubric-argued',
   'spike-knowledge-output',
 ] as const;
 
@@ -87,7 +88,20 @@ const structuralDecisionSchema = z.discriminatedUnion('deferred', [
 ]);
 
 const targetTestSchema = z.object({ file: nonBlank, name: nonBlank });
-const producibleMechanisms = new Set(['executable_test', 'human_review', 'rubric']);
+const producibleMechanisms = new Set(['executable_test', 'rubric']);
+
+/*
+ * A mechanism this kernel used to admit needs a refusal that says what to write
+ * instead. "cannot produce evidence" is true of `human_review` and useless: the
+ * author picked it because a person really is the judge, and hearing that a
+ * person cannot judge reads as a bug in the tool rather than a request (D43).
+ */
+const retiredMechanisms = new Map([
+  [
+    'human_review',
+    'human_review names no standard and assigns nobody, so it stalls where the reviewing was meant to happen — state the rubric a reviewer applies instead',
+  ],
+]);
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined;
@@ -380,14 +394,41 @@ const evidenceProducible: Rule = {
   authorship: 'human_confirms',
   consequence: 'routine',
   tier: 'relational',
-  valueSchema: z.toJSONSchema(z.enum(['executable_test', 'human_review', 'rubric'])),
+  valueSchema: z.toJSONSchema(z.enum(['executable_test', 'rubric'])),
   check(specification) {
     return criteriaOf(specification).flatMap((criterion, index) => {
       const mechanism = criterion['verification'];
       if (typeof mechanism !== 'string' || !mechanism.trim() || producibleMechanisms.has(mechanism)) return [];
       return [{
         slot: criterionSlot(criterion, index, '.verification'),
-        message: `${mechanism} cannot produce evidence at the execution boundary`,
+        message: retiredMechanisms.get(mechanism) ?? `${mechanism} cannot produce evidence at the execution boundary`,
+      }];
+    });
+  },
+};
+
+/*
+ * The argument is the whole mechanism. A rubric with nothing said about why a
+ * deterministic assertion was unavailable is `human_review` under a new name,
+ * and it arrives that way within a week of `human_review` being removed —
+ * usually from an author who did not know it had been.
+ */
+const rubricArgued: Rule = {
+  id: 'rubric-argued',
+  slot: 'acceptance.*.rubricRationale',
+  question: 'Why can this criterion not be settled by a deterministic assertion?',
+  entitlement: 'technical_author',
+  authorship: 'human_confirms',
+  consequence: 'routine',
+  tier: 'relational',
+  valueSchema: z.toJSONSchema(nonBlank),
+  check(specification) {
+    return criteriaOf(specification).flatMap((criterion, index) => {
+      if (criterion['verification'] !== 'rubric') return [];
+      if (nonBlank.safeParse(criterion['rubricRationale']).success) return [];
+      return [{
+        slot: criterionSlot(criterion, index, '.rubricRationale'),
+        message: 'a rubric criterion must say why a deterministic assertion was unavailable',
       }];
     });
   },
@@ -396,18 +437,17 @@ const evidenceProducible: Rule = {
 const spikeKnowledgeOutput: Rule = {
   id: 'spike-knowledge-output',
   slot: 'acceptance.*.verification',
-  question: 'What knowledge will this spike produce, and how will a person review it?',
+  question: 'What knowledge will this spike produce, and against what stated rubric will it be judged?',
   entitlement: 'requester',
   authorship: 'human_confirms',
   consequence: 'routine',
   tier: 'relational',
-  valueSchema: z.toJSONSchema(z.enum(['human_review', 'rubric'])),
+  valueSchema: z.toJSONSchema(z.enum(['rubric'])),
   check(specification) {
     const intent = asRecord(asRecord(specification)?.['intent']);
     if (intent?.['kind'] !== 'spike') return [];
     return criteriaOf(specification).flatMap((criterion, index) => {
-      const mechanism = criterion['verification'];
-      if (mechanism === 'human_review' || mechanism === 'rubric') return [];
+      if (criterion['verification'] === 'rubric') return [];
       return [{
         slot: criterionSlot(criterion, index, '.verification'),
         message: 'a spike criterion must produce reviewable knowledge rather than claim a change',
@@ -424,5 +464,6 @@ export const rules: readonly Rule[] = [
   proposalsResolved,
   humanCriteriaCovered,
   evidenceProducible,
+  rubricArgued,
   spikeKnowledgeOutput,
 ];

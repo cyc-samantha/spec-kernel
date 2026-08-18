@@ -82,7 +82,7 @@ describe('the v1 rules', () => {
   });
 
   it('keeps each check, question, entitlement, and authorship in one rule object', () => {
-    expect(rules).toHaveLength(19);
+    expect(rules).toHaveLength(20);
     for (const rule of rules) {
       expect(rule.question.trim()).not.toBe('');
       expect(rule.entitlement).toMatch(/^(requester|technical_author)$/);
@@ -155,6 +155,7 @@ describe('spike specifications', () => {
     specification.acceptance[0]!.text = 'We know which export formats preserve the required data';
     specification.acceptance[1]!.text = 'The findings compare every candidate format';
     specification.acceptance[1]!.verification = 'rubric';
+    specification.acceptance[1]!.rubricRationale = 'a finding is a comparison, and no assertion settles which comparison is complete';
     delete specification.acceptance[1]!.targetTest;
     expect(sealCheck(specification)).toEqual([]);
   });
@@ -163,6 +164,51 @@ describe('spike specifications', () => {
     const specification = validSpecification();
     specification.intent.kind = 'spike';
     expect(ruleIdsFor(specification)).toEqual(['spike-knowledge-output']);
+  });
+});
+
+/*
+ * D43. Both halves are load-bearing: removing `human_review` without requiring
+ * the rubric's argument moves the stall rather than closing it, and the author
+ * who writes the unargued rubric is usually the one who never heard the
+ * mechanism had been removed.
+ */
+describe('a criterion nobody downstream can service', () => {
+  it('refuses human_review, and says what to write instead', () => {
+    const specification = validSpecification();
+    (specification.acceptance[0] as Record<string, unknown>)['verification'] = 'human_review';
+    const problems = sealCheck(specification).filter((item) => item.ruleId === 'evidence-producible');
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.message).toContain('rubric');
+  });
+
+  it('refuses a rubric that does not argue for itself', () => {
+    const specification = validSpecification();
+    delete specification.acceptance[0]!.rubricRationale;
+    expect(ruleIdsFor(specification)).toEqual(['rubric-argued']);
+  });
+
+  /*
+   * A rationale that is not text cannot be read as an argument. The rule must
+   * refuse it rather than treat a present key as a satisfied requirement —
+   * "has a value" is the failure mode the mechanism was removed for.
+   */
+  it('refuses a rationale it cannot read', () => {
+    const specification = validSpecification();
+    (specification.acceptance[0] as Record<string, unknown>)['rubricRationale'] = 42;
+    expect(ruleIdsFor(specification)).toEqual(['rubric-argued']);
+  });
+
+  /*
+   * A verification that is not text is caught structurally, before any
+   * relational rule is asked to reason about it. Asserting that here keeps the
+   * early return in `sealCheck` from quietly becoming the reason a nonsense
+   * mechanism passes.
+   */
+  it('refuses a verification it cannot read, without consulting the mechanism rules', () => {
+    const specification = validSpecification();
+    (specification.acceptance[0] as Record<string, unknown>)['verification'] = null;
+    expect(ruleIdsFor(specification)).toEqual(['acceptance-stated']);
   });
 });
 

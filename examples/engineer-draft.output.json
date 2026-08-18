@@ -11,8 +11,9 @@
   "acceptance": [
     {
       "id": "AC-01",
-      "text": "A requester can observe that unsupported fields are rejected",
-      "verification": "human_review",
+      "text": "The rejection names the unsupported field and what to send instead",
+      "verification": "rubric",
+      "rubricRationale": "a test can assert the field name appears; whether the instruction is followable is a judgement about wording",
       "provenance": "human_authored"
     },
     {

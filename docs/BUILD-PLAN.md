@@ -784,7 +784,7 @@ emitted value is the same string without putting one in the tree.
 
 ---
 
-### S19b · Only machine-adjudicable criteria — **PLANNED**
+### S19b · Only machine-adjudicable criteria — **DONE**
 
 `branch: s19b-no-human-review`
 
@@ -804,6 +804,33 @@ the golden example is on the wrong side of it: `AC-01` is `human_review`.
 
 **Done when**: a document carrying `human_review` is refused with a reason a
 requester can act on, and an unargued rubric is refused too.
+
+**What landed.** The removal is three lines; the rest of the slice is what stops
+it being cosmetic. `rubric-argued` is a new relational rule with its own slot and
+its own question, because a rule and the question that fills it are one object
+(D6) — bolting the requirement onto `evidence-producible` would have made one
+rule ask two things and left the interview unable to say which.
+
+The refusal message is the part worth arguing about. "human_review cannot produce
+evidence" is true and useless: the author chose it because a person genuinely is
+the judge, so being told a person cannot judge reads as a broken tool rather than
+a request. `retiredMechanisms` maps the mechanism to what to write instead. That
+map is the only place a removed mechanism keeps a name, which is the point — the
+kernel must be able to say what it no longer admits.
+
+`deterministic_assertion` was left alone and is now the odd one out: the document
+type admits it and `evidence-producible` refuses it, because it was the thing the
+question-derivation fixture used to trigger that rule. L2 admits it and ranks it
+*above* a rubric. Being stricter than the layer below is safe, so this is not
+urgent — but it is a disagreement nobody decided, and it should be decided rather
+than inherited.
+
+The example needed a better criterion, not a renamed mechanism. `AC-01` was "a
+requester can observe that unsupported fields are rejected" verified by someone
+looking; it is now "the rejection names the unsupported field and what to send
+instead", argued as a rubric because a test can assert the field name appears and
+cannot assert the instruction is followable. That is what a rubric is for, and
+the old text was a claim the derived test already covered.
 
 ---
 
