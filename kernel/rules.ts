@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+import { signableContentSha } from './canonical.ts';
+import { signatureSchema } from './specification.ts';
+
 export const ruleIds = [
   'intent-declared',
   'specification-identified',
@@ -21,6 +24,8 @@ export const ruleIds = [
   'evidence-producible',
   'rubric-argued',
   'spike-knowledge-output',
+  'signature-required',
+  'signature-binds-content',
 ] as const;
 
 export type RuleId = (typeof ruleIds)[number];
@@ -456,6 +461,75 @@ const spikeKnowledgeOutput: Rule = {
   },
 };
 
+/*
+ * The blast radius that makes a named person mandatory. It mirrors the execution
+ * layer's own condition on purpose: a document refused down there has already
+ * been handed to a team, and the cost of the wrong shape is paid by everyone who
+ * built against it before anyone read the refusal.
+ */
+function needsSignature(specification: Record<string, unknown>): boolean {
+  return specification['irreversibility'] === 'rewrite' || specification['risk'] === 'critical';
+}
+
+const signatureRequired: Rule = {
+  id: 'signature-required',
+  slot: 'signature',
+  question: 'Who is signing this off? A rewrite, or a critical risk, is not started on nobody’s authority.',
+  entitlement: 'requester',
+  authorship: 'human_confirms',
+  consequence: 'authority',
+  tier: 'relational',
+  valueSchema: z.toJSONSchema(signatureSchema),
+  check(specification) {
+    const record = asRecord(specification);
+    // WHY: fail closed. A document this rule cannot read is one whose blast
+    // radius it cannot read either, and the unreadable case is exactly the one
+    // where sealing anyway is worst.
+    if (!record) return [{ slot: 'signature', message: 'a specification must be an object before it can be signed' }];
+    /*
+     * A signature nobody asked for is still one somebody will read, so a
+     * malformed one is refused whether or not the blast radius required it.
+     * This rule owns the whole slot: the drift rule below must see a signature
+     * it can parse, or one unreadable value would produce two questions.
+     */
+    if (!needsSignature(record) && record['signature'] === undefined) return [];
+    if (signatureSchema.safeParse(record['signature']).success) return [];
+    return [{
+      slot: 'signature',
+      message: 'this document needs a named signer, the time they signed, and the hash of what they signed',
+    }];
+  },
+};
+
+/*
+ * A signature that does not name what it signed is decoration. Without the hash,
+ * the document is edited after sign-off and the seal still reads as granted —
+ * which is the same failure D39 catches between the two halves, one level up.
+ */
+const signatureBindsContent: Rule = {
+  id: 'signature-binds-content',
+  slot: 'signature.contentSha',
+  question: 'This document changed after it was signed. Will the signer sign the text it says now?',
+  entitlement: 'requester',
+  authorship: 'human_confirms',
+  consequence: 'authority',
+  tier: 'relational',
+  valueSchema: z.toJSONSchema(signatureSchema.shape.contentSha),
+  check(specification) {
+    const record = asRecord(specification);
+    if (!record) return [{ slot: 'signature.contentSha', message: 'a specification must be an object before a signature over it can be checked' }];
+    const signature = signatureSchema.safeParse(record['signature']);
+    if (!signature.success) return [];
+    const signed = signature.data.contentSha;
+    const now = signableContentSha(record);
+    if (signed === now) return [];
+    return [{
+      slot: 'signature.contentSha',
+      message: `the signed text no longer matches this document: signed ${signed.slice(0, 12)}, now ${now.slice(0, 12)}`,
+    }];
+  },
+};
+
 export const rules: readonly Rule[] = [
   ...structuralRules,
   blockingDecisionsDeclared,
@@ -466,4 +540,6 @@ export const rules: readonly Rule[] = [
   evidenceProducible,
   rubricArgued,
   spikeKnowledgeOutput,
+  signatureRequired,
+  signatureBindsContent,
 ];
