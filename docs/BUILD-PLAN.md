@@ -115,12 +115,40 @@ carries the reasoning that led here and the two-repository resolution D36 retire
 
 | # | Decision |
 |---|---|
-| **D36** | **1a is an agent; 1b is this repository. 1a authors, 1b adjudicates.** The interview and both documents it produces are an agent's work in a session: it elicits the human spec from a requester and writes the technical spec itself, because that is a task an agent does. This repository writes nothing. It defines the rule set, the shape of each document, who may fill which slot, and every verdict; the agent calls `bin/` to learn what is missing and whether it is done. There is therefore no `spec-intake` repository and no `ports/model.ts` — the model is 1b's caller, not its dependency, and an adapter in this tree would be a second, weaker interviewer competing with the one that already has the context. Retires the two-repository resolution in `docs/L1-REARCHITECTURE-TRIAGE.md`, and with it D24, D25, D30, D34, and D35: those bind whatever conducts the interview, which is not code here. |
+| **D36** | **1a is an agent; 1b is this repository. 1a authors, 1b adjudicates.** The interview and both documents it produces are an agent's work in a session: it elicits the human spec from a requester and writes the technical spec itself, because that is a task an agent does. This repository writes nothing. It defines the rule set, the shape of each document, who may fill which slot, and every verdict; the agent calls `bin/` to learn what is missing and whether it is done. There is therefore no `ports/model.ts` — the model is 1b's caller, not its dependency, and an adapter in this tree would be a second, weaker interviewer competing with the one that already has the context. Retires the two-repository resolution in `docs/L1-REARCHITECTURE-TRIAGE.md`, and with it D24, D25, D30, D34, and D35: those bind whatever conducts the interview, which is not code here. *Amended by D42: 1a now has a repository of its own. The split is unchanged — 1a still authors and 1b still adjudicates — but "1a is not a repository" was never what made the split work, and saying so left this ledger stating something false about a repository that exists.* |
 | **D37** | **A specification is two documents, not one, and 1a writes both.** The **human spec** is what the requester wants, why, and how they will know it worked: intent, outcome, metric, and acceptance claims a person can read. The **technical spec** is how it gets built and how a machine proves it: target, scope, context, constraints, and executable criteria. A requester is never asked to author the second. **`risk`, `irreversibility`, and `authority` are human-spec slots**, without exception: they decide how much damage an agent may do unsupervised (D27), and the agent writes the technical half — put them there and it grants itself its own blast radius, with D27 left as a rule with nothing behind it. `awaiting_technical_completion` (D16) stops being an interview state and becomes the boundary between the two documents. |
 | **D38** | **Each half is verified by a different question, and both are required.** The human spec is verified by **sign-off**: a named, entitled human says this is what they want. The technical spec is verified by **no drift**: every human claim still has technical criteria tracing to the exact text that was signed. A signed human spec beside a drifted technical spec is not partially ready — it is refused. Two verdicts, one gate. |
 | **D39** | **`derivedFrom` carries the parent's content hash, not only its id.** An id survives an edit to the thing it names, so revising a human criterion leaves its derived tests pointing at it and silently stale: all green, proving something nobody is asking for any more. The hash turns drift into a fact a program checks instead of a thing a reviewer must notice. This is `context[].contentSha` — already in the schema — applied to the one link that carries authorship. Extends D18; it is the mechanism D38's second verdict runs on. |
 | **D40** | **An outcome and a metric are not acceptance criteria. The metric gates its own presence, never its achievement.** "Churn drops five percent" cannot produce evidence inside a branch, so D19 refuses it as a criterion and `evidence-producible` is right to. But the metric is the evidence that the work was worth doing at all, and **it only means that if it was named before the work started** — a metric chosen afterwards is chosen to flatter the result, and reads as evidence while being its opposite. So: `outcome` says what the work is for; `metric` is the predefined data that would settle whether it happened. Neither carries a verification mechanism and no rule asks either to name a test. But a seal without a metric is refused, exactly as an absent `blockingDecisions` key is refused — "we said in advance what would make this worth doing" and "nobody said" are different documents, and only one of them can be judged later. They are the ruler S7's outcome record is read against, which is what turns "all criteria green, still wrong" from an anecdote into an answerable question. Because both are human-spec slots covered by the sign-off, D39 already makes editing one after the fact a drift that must be re-signed. |
 | **D41** | **A wrong outcome versions the human spec, not the technical one.** The loop back from S7 is: the requester says the shipped change did not do what it was for, and the human spec gains a version. Every derived criterion whose parent hash no longer matches is drifted by D39 and must be re-derived before the next seal. Version n+1 is the next commit (D20) — no new mechanism is needed to express it. The technical spec never versions alone: a technical change with no human change is a different task, not a new version of this one. |
+
+## The layer below, and the layer above
+
+Written 2026-08-18. D42–D46 answer two things nobody had checked: what 1a needs
+from here, and whether what leaves here is admitted by what consumes it.
+
+The measurement that prompted them. `examples/engineer-draft.output.json` — the
+document this repository reports as `"status": "sealed"` — was put through both
+downstream gates for the first time:
+
+| Gate | Verdict |
+|---|---|
+| `lite-harness/engine/contract-shape.ts` (L3) | **accepted** — D3's claim holds |
+| `agent-ticket-system` `src/contract/work-contract.ts` (L2) | **refused**, ten issues |
+
+L2 is `.strict()` and snake_case; L3 is `.passthrough()` and camelCase. So a
+document can satisfy L3 and still be unqueueable, which is what the golden
+example is. D3 named L3 as the finish line and skipped the hop in between. **The
+contract named in D1 does not exist in this repository**, and the document
+standing in for it is refused by the layer that consumes it.
+
+| # | Decision |
+|---|---|
+| **D42** | **A `spec-intake` repository exists, and what it owes this one is a published shape.** 1a's own ledger records the dependency: it may not invent a competing document shape and reconcile later, because reconciling later is the failure the split was built to prevent. So `bin/schema.ts` prints the document shape and every question that fills it, **derived from `rules` rather than written beside them** — a hand-maintained schema is a second list that must agree with the first, and two lists that must agree stop agreeing (D6). Adding a rule publishes its slot; nobody has to remember. An *optional* slot is deliberately unpublished: `signature` is tolerated by the type and read by no rule, and telling 1a to write a field nothing adjudicates is how a value comes to look authoritative without being checked. Amends D36. |
+| **D43** | **`human_review` is not a verification mechanism. A rubric is.** 1a refuses to emit a criterion whose verification is that somebody looks at it: nobody downstream is assigned to look, so it is a stall dressed as a check, and it passes every gate by having a value (D14 again, one layer down). Removed for `change` and `spike` alike. **A rubric survives**, because a written standard is something a person can apply and a requester can disagree with, so S6's spike outlet is unaffected in substance — a spike now produces knowledge reviewable *against a stated rubric*. That is only true while the rubric is argued: **a rubric criterion must state why deterministic verification was unavailable**, which is what L2 already requires of one. Without that, `human_review` returns within a week under a new name. |
+| **D44** | **The sealed document is the audit record; the contract carries pointers to it.** 1a drops its intake box on completion and keeps nothing, so the question "who authorised this slot, and on what grounds" has exactly one place left to be answerable. It is answerable *here*: the human spec and the authorship trace live in what 1b seals. They do **not** travel into the contract — the projection carries `source` and a per-criterion `source_ref` that resolve back, and L2's `.strict()` schema is not extended. Two reasons that is the right side of the line: a contract is what an execution layer needs to do the work, not the record of how the work was agreed; and widening a downstream `.strict()` schema to carry provenance makes every future provenance change a two-repository change. |
+| **D45** | **The projection to a contract is a port, not kernel.** It lives in `ports/contract.ts`, beside `ports/project.ts`, because "the shape the next layer admits" is a fact about the next layer and the kernel holds the universal minimum only — `tests/anti-entropy/kernel-purity.test.ts` already refuses to let a downstream project be named in `kernel/`. Its conformance test asserts **by value against a checked-in fixture**, never by importing the downstream schema: the three layers are on three zod majors (4.4.3, 3.23.8, ^3.24.1), so an import would couple the kernel's dependency graph to a downstream upgrade schedule and fail for reasons that have nothing to do with the contract being wrong. |
+| **D46** | **The seal is currently a synonym for "every rule passed", and that is a defect, not a design.** `signature` is optional and no rule reads it; `ports/project.ts` declares `signing_identity` and no kernel code reads it; there is no `content_sha`, so a signature binds to no content (D20 specifies one). Meanwhile L3 exports `needsSignature` — true when `irreversibility` is `rewrite` or `risk` is `critical` — and 1b has no counterpart, so the documents most worth refusing are precisely the ones it seals and lets L3 refuse afterwards. 1b refuses first. The content hash is L2's canonicalisation rule (keys sorted, array order preserved — the asymmetry is deliberate: key order is a serialisation accident, array order is content) **re-derived here rather than imported**, for D45's reason. |
 
 ### Open, and deliberately not decided yet
 
@@ -135,6 +163,22 @@ carries the reasoning that led here and the two-repository resolution D36 retire
   is checkable for presence and shape. Prose ("clearly faster") is not, and
   admitting it makes the slot filled without making it predefined in any useful
   sense. Decide the shape in S20, when the slot is written.
+- **Whether a blast radius is asked per specification or per project.** 1a elicits
+  the ceiling once per project on the grounds that re-asking guarantees
+  rubber-stamping: the fourth time someone is asked what an agent may do
+  unsupervised, they stop reading. This repository asks `authority` on every
+  specification, and `ports/project.ts` has no ceiling to check an answer
+  against. S3's own discipline says the fix is to extend the declaration rather
+  than special-case a project — but a per-project ceiling and a per-spec grant
+  are different objects and the relationship between them (does the spec narrow
+  the ceiling, or claim against it?) is the part not yet decided. Take it in S20.
+- **Where "is half of this useful?" lands.** 1a asks two questions this document
+  has no slot for: whether a partial delivery is worth having (which is
+  stop-the-line behaviour when ticket 3 of 8 fails) and what order the tickets
+  must go in. `dependsOn` is specification-level, and the `after` ordering a
+  split proposes is validated by a CLI and then discarded. Both are answers a
+  requester gives once and an execution layer needs; neither has anywhere to be
+  written. Take it in S20.
 
 ## Known gaps, and what happens to each
 
@@ -706,6 +750,103 @@ prose. Naming the cost here so the next slice can decide whether to pay it.
 
 ---
 
+### S19a · The shape 1a builds against — **DONE**
+
+`branch: s19a-publish-the-shape`
+
+Carries out D42. 1a is blocked today: it has no published shape, and its own
+ledger forbids it to invent one and reconcile later.
+
+- `bin/schema.ts` prints the document shape and every question that fills it,
+  composed in `kernel/published-schema.ts` from `rules` — which already carry
+  `valueSchema` — rather than from a second, hand-written schema.
+- `SPEC_SCHEMA_VERSION` travels inside the artifact, so 1a pins a version rather
+  than a snapshot of a Tuesday.
+- Retriage D36 and record D42–D46.
+
+**Done when**: 1a can generate against a published artifact, and the ledger
+answers its only external dependency.
+
+**What landed.** The emitter, its four behaviour tests, and one anti-entropy test
+that is the part worth keeping: `tests/anti-entropy/published-shape.test.ts`
+asserts the published slots are exactly the slots `specificationSchema` requires.
+Those two have described the same object since S1 and nothing had ever made them
+prove it. Publishing changes what a divergence costs — it stops being an internal
+inconsistency and becomes 1a generating documents this layer refuses — and it
+would have arrived one slot at a time, silently.
+
+Two smaller findings. Relational rules are published as rules but not as document
+properties: `acceptance.*.verification` is a path across criteria, and publishing
+it as a key would tell 1a to write a slot no rule reads. And the JSON Schema
+dialect is hoisted from what zod emitted rather than written in the source —
+`no-model-runtime` forbids a URL literal in any tracked file, correctly, and the
+emitted value is the same string without putting one in the tree.
+
+---
+
+### S19b · Only machine-adjudicable criteria — **PLANNED**
+
+`branch: s19b-no-human-review`
+
+Carries out D43. 1a and 1b currently disagree about what counts as a check, and
+the golden example is on the wrong side of it: `AC-01` is `human_review`.
+
+- Drop `human_review` from `producibleMechanisms` and from `evidence-producible`'s
+  published values in `kernel/rules.ts`.
+- Narrow `spike-knowledge-output` to `rubric` alone. Its question changes from
+  *how will a person review it* to *against what stated rubric*, which is the
+  same slot asking for something a person can actually be held to.
+- A rubric criterion must carry the argument that deterministic verification was
+  unavailable — mirroring what L2 requires. Without it the removal is cosmetic:
+  the mechanism returns as an unargued rubric.
+- Re-cut `examples/engineer-draft.output.json`. It is the first thing the removal
+  catches, which is the point.
+
+**Done when**: a document carrying `human_review` is refused with a reason a
+requester can act on, and an unargued rubric is refused too.
+
+---
+
+### S19c · The output is admitted by the layer that consumes it — **PLANNED**
+
+`branch: s19c-contract-projection`
+
+Carries out D44 and D45, and closes the finding above: the contract named in D1
+does not exist here.
+
+- `ports/contract.ts` projects a sealed document into the contract L2 queues.
+  Not `kernel/` — `kernel-purity` forbids naming a downstream project there, and
+  rightly.
+- Carry the four things L2 requires and this layer does not produce: `source`
+  (`adapter`, `spec_id`, `spec_path`, `spec_sha`), a per-criterion `source_ref`,
+  slug-shaped ids, and snake_case throughout.
+- A conformance test in `tests/` asserting the projection satisfies a
+  **checked-in fixture** of L2's shape, by value. Never by import (D45).
+
+**Done when**: the golden example projects to a contract L2's `workContractSchema`
+accepts, and reverting any one projection line goes red.
+
+---
+
+### S19d · The seal is a fact, not a verdict — **PLANNED**
+
+`branch: s19d-the-seal`
+
+Carries out D46 and D20's unbuilt half.
+
+- A rule refusing a seal when a signature is required and absent, on L3's
+  conditions: `irreversibility: rewrite` or `risk: critical`. 1b refuses before
+  L3 does rather than after.
+- `signature` gains the hash of what was signed, over a canonical form with keys
+  sorted and array order preserved.
+- This is a gate, so it ships the two tests: one red when the fail-closed line is
+  reverted, one feeding an unevaluable document and asserting refusal.
+
+**Done when**: a `risk: critical` document cannot reach `sealed` unsigned, and
+editing one byte after signing invalidates the signature.
+
+---
+
 ### S20 · The human half is its own document — **PLANNED**
 
 `branch: s20-human-spec`
@@ -729,6 +870,13 @@ anyone can hold, sign, or hand over.
   instead of a terminal state of one (D37).
 - Sign-off is recorded against the human spec alone, with the signer named and
   the signed content hashed — S21 needs that hash to exist.
+- The authorship trace lands inside the sealed document (D44). `kernel/answers.ts`
+  already builds a `SlotAnswer[]` carrying `answeredBy` and hands it back to a
+  caller that no longer exists; since S19 removed the shell, nothing writes it
+  anywhere. Give it a writer, or delete it and stop implying the record is kept.
+- Settle the two questions in § Open that have no slot: the per-project blast
+  radius ceiling, and whether a partial delivery is worth having. Both are being
+  asked by 1a today and dropped on the floor here.
 
 **Done when**: a human spec whose technical slots are all empty is a complete,
 signable document rather than an incomplete one; a metric can be recorded and no
@@ -757,6 +905,11 @@ is asking for. The idiom for the fix is already in the same file —
   reporting no drift.
 - A seal needs both verdicts (D38). Signed-but-drifted is refused, not reported
   as partial progress.
+- Close the second direction while the file is open. `human-criteria-covered`
+  checks human → derived; **nothing checks that a derived criterion's
+  `derivedFrom` resolves to a criterion that exists**, so one pointing at `AC-99`
+  seals today. That is the *agent inventing scope* half of the same invariant,
+  and it is the cheaper of the two to write.
 
 **Done when**: changing one word of a signed human criterion refuses the seal
 and names which derived criterion drifted from which parent, and a technical
@@ -798,7 +951,14 @@ Written down so nobody rediscovers them mid-build.
 - **A signature service.** A merged pull request is the seal (D20).
 - **In-flight overlap detection.** Wait for ten contracts a day.
 - **Pricing vagueness back to the requester.** Wait for abuse data.
-- **Any change to L2.** Output feeds the existing adapter.
+- **Any change to L2.** Still the decision, but not for the reason first written.
+  "Output feeds the existing adapter" was an assumption and it was false: the only
+  adapter in L2 is `harness-factory-map`, which projects from a build brief, and
+  nothing there has ever read a document from here. What holds the line now is
+  D44 — the contract carries pointers to the sealed document rather than the
+  document — and D45 puts the projection in `ports/contract.ts` on this side of
+  the boundary, so L2's `.strict()` schema stays untouched by design rather than
+  by neglect.
 - **A model port, an adapter, or any browser surface.** Retired by D36, not
   deferred by it. The interview is conducted by the agent that already has the
   context; a `ModelPort` in this tree is a second, weaker interviewer competing

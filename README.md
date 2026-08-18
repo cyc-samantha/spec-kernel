@@ -97,6 +97,7 @@ agent may do unsupervised must be accepted one at a time.
 | `kernel/answers.ts` | the append-only answer ledger and its entitlement check |
 | `kernel/outcomes.ts` | append-only green-but-wrong learning signal |
 | `kernel/split.ts` | split proposal validation by dependence and repository boundary |
+| `kernel/published-schema.ts` | the document shape and its questions, derived from the rules so it cannot drift from them |
 | `ports/project.ts` | repository boundary, entitlement identities, and signer |
 | `skills/draft-specification/` | what 1a reads for assert-first intake |
 | `skills/elicit-specification/` | what 1a reads for elicit-first intake, driven only by missing items |
@@ -118,6 +119,16 @@ The command exits zero only for a sealed specification and prints every missing
 item otherwise. `bin/interview.ts`, `bin/record-outcome.ts`, and `bin/split.ts`
 expose the other deterministic surfaces; run any without arguments to see its
 required files.
+
+Print the shape a document must take, and every question that fills it:
+
+```bash
+node bin/schema.ts
+```
+
+It is derived from the rules that adjudicate, so it cannot describe a document
+this kernel would refuse. Generate against it rather than against an example —
+an example is one document, and the artifact is the set of them.
 
 `.ts` runs directly under Node's type stripping. There is no build step, and
 adding one would be a regression.
